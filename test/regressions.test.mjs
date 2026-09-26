@@ -375,3 +375,16 @@ test("a cart saved before tickets existed still isn't charged postage", () => {
   const build = readFileSync(new URL("../src/build.mjs", import.meta.url), "utf8");
   assert.match(build, /window\.__tickets=/, "the build must publish which products are tickets");
 });
+
+test("a cart row keeps its shape when an item has a pre-order date", () => {
+  // The picture and the words were siblings in one cell, so "Pre-order, ships 2026-11-13"
+  // wrapped under the thumbnail and pushed Remove onto its own line — a row that looked
+  // broken next to a row that didn't.
+  const site = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
+  assert.match(site, /<div class="ci">/, "picture and text must be separate columns");
+  assert.match(site, /<div class="ci-t">/, "the text needs its own wrapping column");
+
+  const css = readFileSync(new URL("../src/site.css", import.meta.url), "utf8");
+  assert.match(css, /\.cart \.ci\{display:flex/, "the row needs to be a flex row");
+  assert.match(css, /\.cart \.ci-t\{min-width:0\}/, "min-width:0 or a long title refuses to wrap");
+});

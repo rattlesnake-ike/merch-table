@@ -71,8 +71,11 @@ table{border-collapse:collapse;width:100%;font-size:15px}
 th,td{text-align:left;vertical-align:top;padding:10px 12px 10px 0;border-bottom:1px solid var(--rule)}
 th{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
 td.num,th.num{text-align:right;font-family:var(--mono);white-space:nowrap}
-.cart td img{width:56px;height:56px;object-fit:cover;background:#fff;border:1px solid var(--rule);vertical-align:middle;margin-right:10px}
-.cart .rm{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline;font-size:13.5px;margin-left:8px}
+.cart td img{width:56px;height:56px;object-fit:cover;background:#fff;border:1px solid var(--rule);flex:none}
+/* Picture and words side by side; the words wrap within their own column. */
+.cart .ci{display:flex;gap:10px;align-items:flex-start}
+.cart .ci-t{min-width:0}
+.cart .rm{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline;font-size:13.5px;margin-top:2px;display:inline-block}
 .cart input{width:56px;padding:6px;border:1.5px solid var(--ink);background:var(--paper);font:inherit;font-family:var(--mono)}
 .checkout{max-width:480px;margin:24px 0 0}
 .field label{width:100%;font-weight:600}

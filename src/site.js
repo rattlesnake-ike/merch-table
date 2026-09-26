@@ -90,7 +90,10 @@
     const ship = () => { const r = (window.__shipping || []).find((x) => x.countries.includes(country.value)); return r || null; };
     const render = () => {
       const cart = load(); empty.hidden = cart.length > 0; full.hidden = cart.length === 0; if (!cart.length) return;
-      rows.innerHTML = cart.map((i, n) => `<tr><td>${i.image ? `<img src="/${esc(i.image)}" alt="">` : ""}<a href="/products/${encodeURIComponent(i.product)}/">${esc(i.title)}</a>${i.vtitle && i.vtitle !== "One size" ? ` <small>${esc(i.vtitle)}</small>` : ""}${i.ship ? `<br><small>Pre-order, ships ${esc(i.ship)}</small>` : ""}<button class="rm" data-rm="${n}" type="button">Remove</button></td><td class="num">${fmt(i.price)}</td><td><input type="number" min="1" max="10" value="${Number(i.qty) || 1}" data-qty="${n}" aria-label="Quantity"></td><td class="num">${fmt(i.price * i.qty)}</td></tr>`).join("");
+      // The thumbnail and the words are separate columns inside the cell, so a long line —
+      // "Pre-order, ships 2026-11-13" — wraps under the TEXT rather than under the picture and
+      // breaking the row apart. Remove sits on its own line, in the same place on every row.
+      rows.innerHTML = cart.map((i, n) => `<tr><td><div class="ci">${i.image ? `<img src="/${esc(i.image)}" alt="">` : ""}<div class="ci-t"><a href="/products/${encodeURIComponent(i.product)}/">${esc(i.title)}</a>${i.vtitle && i.vtitle !== "One size" ? ` <small>${esc(i.vtitle)}</small>` : ""}${i.ship ? `<br><small>Pre-order, ships ${esc(i.ship)}</small>` : ""}<br><button class="rm" data-rm="${n}" type="button">Remove</button></div></div></td><td class="num">${fmt(i.price)}</td><td><input type="number" min="1" max="10" value="${Number(i.qty) || 1}" data-qty="${n}" aria-label="Quantity"></td><td class="num">${fmt(i.price * i.qty)}</td></tr>`).join("");
       const sub = cart.reduce((a, i) => a + i.price * i.qty, 0);
       // Tickets are collected at a door. A cart of only tickets must not ask where to post them.
       //
