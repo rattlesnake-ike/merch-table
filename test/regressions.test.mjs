@@ -193,3 +193,32 @@ test("a ticket code is found however it is typed", async () => {
     assert.ok(await ticketByCode(env, typed), `door staff typed "${typed}" and it was not found`);
   }
 });
+
+import { headcount } from "../worker/tickets.js";
+
+test("the door can say how many are in the room", async () => {
+  const keys = [];
+  const env = { STOCK: {
+    list: async () => ({ keys, list_complete: true }),
+    get: async () => null, put: async () => {},
+  } };
+  const products = [
+    { id: "fri", title: "Friday", variants: [{ id: "one" }], show: { date: "2099-01-01", title: "Friday", capacity: 200 } },
+    { id: "sat", title: "Saturday", variants: [{ id: "one" }], show: { date: "2099-01-02", title: "Saturday", capacity: 120 } },
+  ];
+  for (let i = 0; i < 37; i++) keys.push({ name: `ticket:o${i}:fri:one:0` });
+  for (let i = 0; i < 5; i++) keys.push({ name: `ticket:o${i}:sat:one:0` });
+
+  const c = await headcount(env, products);
+  const fri = c.find((x) => x.id === "fri");
+  const sat = c.find((x) => x.id === "sat");
+  assert.equal(fri.inRoom, 37, "Friday's count must not include Saturday's check-ins");
+  assert.equal(sat.inRoom, 5);
+  assert.equal(fri.capacity, 200);
+});
+
+test("a show that has happened is not counted at the door", async () => {
+  const env = { STOCK: { list: async () => ({ keys: [], list_complete: true }), get: async () => null, put: async () => {} } };
+  const past = [{ id: "old", title: "Last year", variants: [{ id: "one" }], show: { date: "2020-01-01", title: "Last year" } }];
+  assert.equal((await headcount(env, past)).length, 0);
+});

@@ -1,5 +1,5 @@
 import { listOrders, getOrder, markShipped, orderRows, trackingUrl, ticketByCode, backfillTicketIndex } from "./orders.js";
-import { isTicket, ticketProducts, ticketsForOrder, verifyCode, admit, usedAt, showOver } from "./tickets.js";
+import { isTicket, ticketProducts, ticketsForOrder, verifyCode, admit, usedAt, showOver, headcount } from "./tickets.js";
 /* The band's own admin: sign in by emailed link, edit products on a phone, save, done.
    No GitHub, no files, no terminal. Live edits go to KV and the Worker serves them
    over the built pages; the repo stays the backup, not the bottleneck. */
@@ -222,13 +222,22 @@ async function doorScreen(req, env, url, store, products, me, demo) {
   </style>`;
   const page = (body, status = 200) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Door</title>${css}</head><body><main>${body}</main></body></html>`, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 
-  const form = async (msg = "") => `<h1>Door</h1>
+  const form = async (msg = "") => {
+    // How many are in the room. A fire marshal asks for this number, and a settlement starts
+    // from it, so it is counted from the check-ins rather than kept as a tally that can drift.
+    const counts = demo ? [] : await headcount(env, products).catch(() => []);
+    const countLine = counts.length
+      ? `<p class="count">${counts.map((c) => `<span><b>${c.inRoom}</b> in the room${typeof c.capacity === "number" ? ` of ${c.capacity}` : ""} · ${escapeHtml(c.title)}</span>`).join("")}</p>`
+      : "";
+    return `<h1>Door</h1>
     ${shows.length ? `<p class="sub">${shows.map((p) => escapeHtml(p.show.title ?? p.title)).join(" · ")}</p>` : `<p class="sub">No upcoming shows in the store.</p>`}
+    ${countLine}
     ${msg}
     <form method="post"><input type="hidden" name="_t" value="${demo ? "" : await csrfToken(env.SESSION_SECRET, me)}">
       <input name="code" required autofocus autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-1234" aria-label="Ticket code" inputmode="latin">
       <button type="submit">Check in</button></form>
     <p class="fine"><a href="/admin">Products</a> · <a href="/admin/orders">Orders</a></p>`;
+  };
 
   if (req.method !== "POST") return page(await form());
 

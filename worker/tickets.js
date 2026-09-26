@@ -87,3 +87,26 @@ export function ticketHtml(t, order, store, used) {
     ${used ? `<p class="stamp">Already checked in</p>` : ""}
   </article>`;
 }
+
+/**
+ * How many people are in the room, per show. The number a fire marshal asks for and the number a
+ * settlement starts from. Counted from the check-ins themselves, so it cannot drift from the door.
+ */
+export async function headcount(env, products) {
+  if (!env.STOCK) return [];
+  const live = ticketProducts(products).filter((p) => !showOver(p));
+  if (!live.length) return [];
+  const out = [];
+  for (const p of live) {
+    let inRoom = 0;
+    // KV list is prefix-based; every check-in is `ticket:<order>:<product>:<variant>:<n>`.
+    let cursor, done = false;
+    while (!done) {
+      const r = await env.STOCK.list({ prefix: "ticket:", cursor, limit: 1000 });
+      for (const k of r.keys) if (k.name.includes(`:${p.id}:`)) inRoom++;
+      cursor = r.cursor; done = r.list_complete || !r.cursor;
+    }
+    out.push({ id: p.id, title: p.show?.title ?? p.title, capacity: p.show?.capacity ?? null, inRoom });
+  }
+  return out;
+}
