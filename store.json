@@ -109,5 +109,7 @@
     "corners": "square",
     "headings": "uppercase",
     "font": "system"
-  }
+  },
+  "statement_descriptor": "NORTHERN DOGS",
+  "terms_url": true
 }

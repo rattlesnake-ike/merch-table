@@ -44,3 +44,32 @@ test("the cart escapes every field it writes into the page", () => {
   assert.doesNotMatch(site, /<img src="\/\$\{i\.image\}"/, "image path must be escaped");
   assert.doesNotMatch(site, /ships \$\{i\.ship\}/, "ship date must be escaped");
 });
+
+import { trackingUrl } from "../worker/orders.js";
+const orders = readFileSync(new URL("../worker/orders.js", import.meta.url), "utf8");
+
+test("a buyer's lookup shows their order and never someone else's", () => {
+  // Email is not proof of identity, so the lookup must show only receipt-level facts.
+  assert.match(orders, /ordersForEmail[\s\S]*?filter\(\(o\) => \(o\.email \?\? ""\)\.toLowerCase\(\) === e\)/);
+  const rows = orders.slice(orders.indexOf("export function orderRows"));
+  assert.match(rows, /forBand \?/, "the address and phone are shown to the band only");
+});
+
+test("tracking numbers become links a buyer can click", () => {
+  assert.match(trackingUrl("USPS", "94001118992231974"), /tools\.usps\.com/);
+  assert.match(trackingUrl("ups", "1Z999"), /ups\.com\/track/);
+  assert.match(trackingUrl("FedEx Ground", "7712"), /fedex\.com/);
+  assert.equal(trackingUrl("Some Local Courier", "X1"), null);   // unknown carrier: no guessed link
+  assert.equal(trackingUrl("USPS", ""), null);
+});
+
+test("a tracking number is stripped of anything that isn't a tracking number", () => {
+  assert.match(orders, /String\(tracking\)\.replace\(\/\[\^A-Za-z0-9-\]\/g, ""\)/);
+});
+
+test("the store records what a bank asks for, at the time of sale", () => {
+  // None of this can be reconstructed months later when a dispute arrives.
+  for (const field of ["buyer:", "order_no:", "ordered_at:", "ip_country:", "goods:", "terms:"]) assert.ok(worker.includes(field), `checkout must record ${field}`);
+  assert.match(worker, /buyerKey = ip \? await shortHash/, "the buyer key must be a hash, never a stored IP");
+  assert.doesNotMatch(worker, /metadata: \{[^}]*\bip:/, "a raw IP must never go into Stripe metadata");
+});

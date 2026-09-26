@@ -1,3 +1,4 @@
+import { listOrders, getOrder, markShipped, orderRows, trackingUrl } from "./orders.js";
 /* The band's own admin: sign in by emailed link, edit products on a phone, save, done.
    No GitHub, no files, no terminal. Live edits go to KV and the Worker serves them
    over the built pages; the repo stays the backup, not the bottleneck. */
@@ -129,6 +130,8 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
   const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
   const html = (body, status = 200) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 
+  if (path === "/admin/orders" || path.startsWith("/admin/orders/")) return await ordersScreen(req, env, url, store, me, demo);
+
   if (path === "/admin" && req.method === "GET") {
     const rows = products.map((p) => {
       const sizes = p.variants.map((v) => `<span class="${v.available === false ? "out" : "in"}">${escapeHtml(v.title)}</span>`).join(" ");
@@ -140,7 +143,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
       ${demo ? `<p class="demo">You're looking at the admin of a made-up band's store. Everything works except saving. <a href="https://github.com/rattlesnake-ike/merch-table">This is the store</a>.</p>` : ""}
       <p class="sub">Tap a product to change its price, mark a size sold out, or hide it. Changes go live straight away.</p>
       <div class="list">${rows}</div>
-      <p class="fine"><a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
+      <p class="fine"><a href="/admin/orders">Orders</a> · <a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
   }
 
   if (path.startsWith("/admin/p/")) {
@@ -193,6 +196,72 @@ export function parsePrice(raw) {
   const cents = Math.round(Number(s) * 100);
   if (!Number.isFinite(cents) || cents <= 0 || cents > MAX_PRICE) return null;
   return cents;
+}
+
+/** The band's order list, and the one box that protects them: tracking. */
+async function ordersScreen(req, env, url, store, me, demo) {
+  const html = (body, status = 200) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+  const id = url.pathname.startsWith("/admin/orders/") ? decodeURIComponent(url.pathname.slice("/admin/orders/".length)) : null;
+
+  if (req.method === "POST") {
+    if (demo) return html(`<h1>This is the demo</h1><p>On your own store this would have saved. <a href="/admin/orders">Back</a></p>`);
+    const form = await req.formData();
+    if (!timingSafeEqual(String(form.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<h1>That form had gone stale</h1><p><a href="/admin/orders">Open it again</a>.</p>`, 403);
+    await markShipped(env, String(form.get("id") ?? ""), { carrier: form.get("carrier"), tracking: form.get("tracking"), note: form.get("note") });
+    return new Response("", { status: 302, headers: { location: "/admin/orders?saved=1" } });
+  }
+
+  if (id) {
+    const o = await getOrder(env, id);
+    if (!o) return html(`<h1>Not found</h1><p><a href="/admin/orders">Back to orders</a></p>`, 404);
+    return html(`<header class="bar"><a class="ghost" href="/admin/orders">&lsaquo; Orders</a></header>${disputePack(o, store)}`);
+  }
+
+  const orders = demo ? [] : await listOrders(env, 200);
+  const toPack = orders.filter((o) => o.status !== "shipped");
+  const tok = demo ? "" : await csrfToken(env.SESSION_SECRET, me);
+  const row = (o) => {
+    const t = trackingUrl(o.carrier, o.tracking);
+    return `<div class="row" style="display:block">
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap"><b style="flex:1;min-width:12rem">${escapeHtml(o.goods || o.items)}</b><span class="mono">${new Intl.NumberFormat(store.locale ?? "en-US", { style: "currency", currency: (o.currency ?? "usd").toUpperCase() }).format((o.total ?? 0) / 100)}</span></div>
+      <small>${escapeHtml(o.name ?? "")} · ${escapeHtml(o.email ?? "")} · ${new Date(o.at).toLocaleDateString(store.locale ?? "en-US", { day: "numeric", month: "short" })}${Number(o.orderNo) > 1 ? ` · their order ${escapeHtml(o.orderNo)}` : ""}</small>
+      ${o.ship?.address ? `<br><small>${escapeHtml([o.ship.address.line1, o.ship.address.line2, o.ship.address.city, o.ship.address.state, o.ship.address.postal_code, o.ship.address.country].filter(Boolean).join(", "))}</small>` : ""}
+      ${o.status === "shipped"
+        ? `<p class="fine" style="margin:8px 0 0">Shipped ${new Date(o.shippedAt).toLocaleDateString(store.locale ?? "en-US", { day: "numeric", month: "short" })}${o.tracking ? ` · ${t ? `<a href="${t}" rel="noopener">${escapeHtml(o.carrier || "track")} ${escapeHtml(o.tracking)}</a>` : escapeHtml(o.tracking)}` : ""} · <a href="/admin/orders/${encodeURIComponent(o.id)}">If this is ever disputed</a></p>`
+        : `<form method="post" style="margin-top:10px;padding:0;border:0;background:none"><input type="hidden" name="_t" value="${tok}"><input type="hidden" name="id" value="${escapeHtml(o.id)}">
+           <div style="display:flex;gap:8px;flex-wrap:wrap"><input name="carrier" placeholder="USPS" list="carriers" style="flex:0 0 7rem"><input name="tracking" placeholder="Tracking number" style="flex:1;min-width:10rem"><button type="submit" style="width:auto;margin:0;padding:10px 16px">Shipped</button></div></form>`}
+    </div>`;
+  };
+  return html(`<header class="bar"><h1>Orders</h1><a class="ghost" href="/admin">Products</a></header>
+    ${demo ? `<p class="demo">A real store lists its orders here, with a box to put the tracking number in. There are none on the demo.</p>` : ""}
+    ${url.searchParams.get("saved") ? `<p class="demo" style="background:#e8f5e9;border-color:#a5c8a9">Marked shipped. That tracking number is the best protection you have if this is ever disputed.</p>` : ""}
+    <datalist id="carriers"><option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Royal Mail</option></datalist>
+    ${orders.length ? `<p class="sub">${toPack.length} to pack${orders.length - toPack.length ? `, ${orders.length - toPack.length} shipped` : ""}. Put the tracking number in when you post it: it is what answers a bank if a buyer ever says it never arrived.</p><div class="list">${orders.map(row).join("")}</div>` : demo ? "" : `<p class="sub">No orders yet. They appear here the moment someone pays.</p><p class="fine">Orders only arrive here if Stripe can reach your store: set the webhook (README step 6.4). Without it the store still sells, but this list stays empty.</p>`}
+    <p class="fine"><a href="/orders">What a buyer sees</a> · <a href="/admin">Products</a></p>`);
+}
+
+/** Everything a bank asks for, in the order Stripe's form asks for it, ready to paste. */
+function disputePack(o, store) {
+  const t = trackingUrl(o.carrier, o.tracking);
+  const line = (k, v) => v ? `<tr><td><b>${escapeHtml(k)}</b></td><td>${v}</td></tr>` : "";
+  return `<h1 style="font-size:1.5rem">If this order is disputed</h1>
+  <p class="sub">A dispute gives you a few days to answer. Paste these into Stripe's form, field by field. Most of it exists only because the store wrote it down when the order was placed.</p>
+  <div class="tbl"><table><tbody>
+    ${line("Product description", escapeHtml(o.goods || o.items))}
+    ${line("Order date", new Date(o.at).toUTCString())}
+    ${line("Amount", new Intl.NumberFormat(store.locale ?? "en-US", { style: "currency", currency: (o.currency ?? "usd").toUpperCase() }).format((o.total ?? 0) / 100))}
+    ${line("Customer name", escapeHtml(o.name ?? ""))}
+    ${line("Customer email", escapeHtml(o.email ?? ""))}
+    ${line("Shipping address", o.ship?.address ? escapeHtml([o.ship.address.line1, o.ship.address.line2, o.ship.address.city, o.ship.address.state, o.ship.address.postal_code, o.ship.address.country].filter(Boolean).join(", ")) : "")}
+    ${line("Shipping carrier", escapeHtml(o.carrier ?? ""))}
+    ${line("Tracking number", escapeHtml(o.tracking ?? ""))}
+    ${line("Shipping date", o.shippedAt ? new Date(o.shippedAt).toUTCString() : "")}
+    ${line("Country the order came from", escapeHtml(o.ipCountry ?? ""))}
+    ${line("Earlier orders from this buyer", Number(o.orderNo) > 1 ? `${escapeHtml(o.orderNo)} orders in total. Visa's Compelling Evidence rule lets two earlier undisputed orders from the same buyer overturn a fraud claim — search this list for the same email or address and include them.` : "")}
+    ${line("Refund policy", `Shown at checkout and at ${escapeHtml(store.siteUrl ?? "")}/shipping/`)}
+  </tbody></table></div>
+  ${o.tracking ? `<p class="demo" style="background:#e8f5e9;border-color:#a5c8a9"><b>You have tracking.</b> That is the single strongest piece of evidence for &ldquo;it never arrived&rdquo;. ${t ? `Screenshot the delivery confirmation at <a href="${t}" rel="noopener">the carrier's page</a> and attach it as a file.` : "Screenshot the carrier's delivery confirmation and attach it."}</p>` : `<p class="demo"><b>No tracking on this order.</b> If you have a receipt from the post office, photograph it. Without proof of delivery a &ldquo;never arrived&rdquo; claim is very hard to answer, which is why it is worth adding tracking to everything.</p>`}
+  <p class="fine">Before you fight it, consider writing to the buyer: a refund or a replacement usually costs less than a lost dispute, and a withdrawn dispute costs nothing. Banks never read links, so attach files rather than pointing at pages.</p>`;
 }
 
 function describe(before, after, store) {

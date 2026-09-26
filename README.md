@@ -117,6 +117,18 @@ For the sign-in emails to arrive, add a [Resend](https://resend.com) API key as 
 
 **How it's kept safe:** the sign-in link works once, expires in fifteen minutes, and can never be used as a session by itself. Someone who isn't an owner gets the identical "check your email" response, so the store can't be used to find out who runs it. Saves are refused unless they come from your own store, and every form carries a token tied to your session.
 
+## Orders, and not losing an argument with a bank
+
+Every paid order lands at **`/admin/orders`**: who ordered, what, where it goes, and a box for the tracking number. Put the tracking in when you post it. That one habit is the difference between winning and losing if a buyer ever tells their bank the parcel never came.
+
+Your buyers get **`/orders`** on the store, linked from the footer and the thank-you page. They type the email they paid with and see their own order and its tracking. Nothing else is shown, and an address is never revealed there. Most disputes are not fraud, they're someone who forgot or couldn't find you, so this page and a reply-to address prevent more chargebacks than any fraud tool.
+
+If a dispute does arrive, open the order and click **"If this is ever disputed"**. Every field Stripe's response form asks for is already filled in, because the store recorded it when the order was placed: the product description, the terms the buyer agreed to, the country the order came from, the shipping address and date, the tracking number, and how many times that buyer has ordered from you before. That last one matters: Visa's Compelling Evidence rule lets two earlier undisputed orders from the same buyer overturn a fraud claim outright.
+
+**What protects the buyer**, in the same breath: a real refund policy shown at checkout, their own order page, a human to write to, and a store that keeps no card details at all. Card numbers never touch this code, only Stripe's.
+
+**One setting worth turning on.** In Stripe, **Radar** screens every payment for free and blocks the highest-risk ones. If you sell something expensive, add a rule under Radar → Rules: `Request 3D Secure if :risk_level: != 'normal'`. When a buyer authenticates that way, fraud liability moves from you to their bank.
+
 ## Day to day: files
 
 | To… | Do this |
@@ -149,7 +161,8 @@ src/templates.mjs the HTML of every page
 src/site.css      the stylesheet
 src/site.js       cart, size picker, drops, stock, checkout hand-off
 worker/index.js   the server: /api/checkout, /api/session, /api/stock, /api/restock, /api/webhook, /api/wants, /api/setup
-worker/admin.js   the band's admin: sign-in links, the product editor
+worker/admin.js   the band's admin: sign-in links, the product editor, the order list
+worker/orders.js  orders, tracking, the buyer's lookup, the dispute pack
 scripts/          import-shopify.mjs, check.mjs
 ```
 

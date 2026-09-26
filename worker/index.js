@@ -4,6 +4,7 @@ import store from "../store.json" with { type: "json" };
 import products from "../products.json" with { type: "json" };
 import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
 import { handleAdmin, currentAdmin } from "./admin.js";
+import { recordOrder, ordersForEmail, orderRows } from "./orders.js";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, status);
@@ -40,6 +41,7 @@ export default {
       // A page the band has edited is patched on the way out, so a save shows at once.
       if (env.STOCK && (url.pathname === "/" || /^\/products\/[^/]+\/?$/.test(url.pathname))) return await patchPage(req, env, url, await liveProducts(env));
       if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, await liveProducts(env));
+      if (url.pathname === "/orders" || url.pathname === "/orders/") return await lookup(req, env, url);
       if (url.pathname === "/api/catalogue") return json({ products: (await liveProducts(env)).filter((p) => !p.hidden && isLive(p)) });
       if (url.pathname === "/api/session" && req.method === "GET") return await session(env, url);
       if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url, await liveProducts(env));
@@ -115,6 +117,25 @@ async function patchPage(req, env, url, live) {
     }
   }
   return new Response(html, { status: res.status, headers: { ...Object.fromEntries(res.headers), "cache-control": "no-store" } });
+}
+
+/* ---------- /orders : a buyer finding their own order ----------
+   Email only. It proves nothing on its own, so this shows only what a receipt would have
+   shown them anyway, and never an address or a phone number. The point is that a confused
+   buyer reaches the band instead of their bank. */
+async function lookup(req, env, url) {
+  const page = (body, status = 200) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Your order · ${escapeHtmlLite(store.name)}</title><link rel="stylesheet" href="/site.css"></head><body><div class="top"><a class="wm" href="/">${escapeHtmlLite(store.name)}</a></div><main class="prose" style="padding:0 20px">${body}</main></body></html>`, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+
+  const help = `<p>Can't find it, or something's wrong with the order? Write to <a href="mailto:${escapeHtmlLite(store.email ?? "")}">${escapeHtmlLite(store.email ?? "the band")}</a> and a person will answer. Please do that before asking your bank: we can fix it, and a bank dispute takes months and costs us both.</p>`;
+
+  if (req.method !== "POST") return page(`<h1>Your order</h1><p class="lede">Type the email you paid with and we'll show you where it is.</p><form method="post" class="restock"><div><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" aria-label="Your email"><button class="btn" type="submit">Find it</button></div></form>${help}`);
+
+  if (Number(req.headers.get("content-length") ?? 0) > 2048) return page(`<h1>Try again</h1>`, 413);
+  const form = await req.formData();
+  const email = String(form.get("email") ?? "");
+  const orders = await ordersForEmail(env, email);
+  if (!orders.length) return page(`<h1>Nothing under that address</h1><p class="lede">We can't find an order for <b>${escapeHtmlLite(email)}</b>. It may have been placed with a different email, or the payment may not have gone through.</p>${help}`);
+  return page(`<h1>Your order${orders.length > 1 ? "s" : ""}</h1><div class="tbl"><table><thead><tr><th>What</th><th class="num">Paid</th><th>Where it is</th></tr></thead><tbody>${orderRows(orders, store, { forBand: false })}</tbody></table></div>${help}`);
 }
 
 /* ---------- GET /api/setup : is this store actually ready to take money? ---------- */
@@ -215,6 +236,22 @@ async function checkout(req, env, url, products) {
   if (soldOut.length) return bad(`Sold out while it sat in the cart: ${soldOut.map((s) => s.title).join(", ")}. It's been taken out; the rest is still there.`, 409, { soldOut });
   const free = region.free_over && subtotal >= region.free_over;
   const site = (env.SITE_URL || url.origin).replace(/\/$/, "");
+
+  // A short, stable key for the buyer's network, so repeat customers can be recognised without
+  // the store keeping anyone's IP. Two orders from the same person share it; it identifies nobody.
+  const ip = req.headers.get("cf-connecting-ip") ?? "";
+  const buyerKey = ip ? await shortHash(`${ip}|${env.SESSION_SECRET ?? site}`) : "";
+  const orderIndex = env.STOCK && buyerKey ? Number((await env.STOCK.get(`buyer:${buyerKey}`)) ?? 0) + 1 : 0;
+  if (env.STOCK && buyerKey) await env.STOCK.put(`buyer:${buyerKey}`, String(orderIndex), { expirationTtl: 400 * 24 * 3600 });
+  const evidence = {
+    buyer: buyerKey,
+    order_no: String(orderIndex),
+    ordered_at: new Date(now).toISOString(),
+    ip_country: req.headers.get("cf-ipcountry") ?? "",
+    goods: lines.map((l) => l.price_data.product_data.name).join("; ").slice(0, 480),
+    terms: `${site}/shipping/`,
+    ...(shipDate ? { ships: shipDate } : {}),
+  };
   const s = await stripe(env, "POST", "/checkout/sessions", {
     mode: "payment",
     line_items: lines,
@@ -226,9 +263,21 @@ async function checkout(req, env, url, products) {
     shipping_options: [{ shipping_rate_data: { type: "fixed_amount", display_name: free ? `${region.name}: free shipping` : region.name, fixed_amount: { amount: free ? 0 : region.amount, currency: store.currency }, ...(region.estimate ? { metadata: { estimate: region.estimate } } : {}) } }],
     ...(store.phone_at_checkout ? { phone_number_collection: { enabled: true } } : {}),
     ...(store.tax?.automatic ? { automatic_tax: { enabled: true } } : {}),
-    ...(shipDate ? { custom_text: { submit: { message: `Pre-order: your order ships ${fmtDate(shipDate, store.locale)}.` } } } : {}),
-    payment_intent_data: { description: `${store.name} order`, metadata: { items: meta.join(",") } },
-    metadata: { items: meta.join(","), region: region.id },
+    // What a bank wants to see if this is ever disputed. Written now because none of it can be
+    // reconstructed months later: a product description, the terms the buyer was shown, and
+    // the network the order came from. Visa's Compelling Evidence 3.0 also needs two earlier
+    // undisputed orders sharing two of {IP, shipping address, device, account} — so the IP and
+    // a buyer key go on every order, and `orderIndex` lets the band find the earlier ones.
+    payment_intent_data: {
+      description: `${store.name} order`,
+      metadata: { items: meta.join(","), ...evidence },
+      ...(store.statement_descriptor ? { statement_descriptor_suffix: String(store.statement_descriptor).slice(0, 22) } : {}),
+    },
+    metadata: { items: meta.join(","), region: region.id, ...evidence },
+    ...(store.terms_url || store.email ? { custom_text: {
+      ...(shipDate ? { submit: { message: `Pre-order: your order ships ${fmtDate(shipDate, store.locale)}.` } } : {}),
+      terms_of_service_acceptance: { message: `By ordering you agree to our [shipping and returns terms](${site}/shipping/). Questions about an order: ${store.email ?? "the address on the store"}.` },
+    }, consent_collection: { terms_of_service: "required" } } : {}),
     expires_at: Math.floor(now / 1000) + 60 * 60,
   });
   return json({ url: s.url });
@@ -300,6 +349,9 @@ async function webhook(req, env) {
   const ev = JSON.parse(raw);
   if (ev.type === "checkout.session.completed" || ev.type === "checkout.session.async_payment_succeeded") {
     const s = ev.data.object;
+    // Keep the order before anything else: this is the band's only record outside Stripe,
+    // and it is what answers "where is my thing" without either side guessing.
+    if (s.payment_status === "paid") await recordOrder(env, await stripe(env, "GET", `/checkout/sessions/${s.id}`).catch(() => s));
     if (s.payment_status === "paid" && env.STOCK) {
       const done = await env.STOCK.get(`order:${s.id}`); // idempotent: Stripe retries
       if (!done) {
