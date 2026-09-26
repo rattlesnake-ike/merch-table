@@ -140,3 +140,56 @@ test("the sold-out wording is changeable without editing the script", () => {
   assert.match(siteJs, /prod\.dataset\.soldOutText/);
   assert.match(readFileSync(new URL("../src/templates.mjs", import.meta.url), "utf8"), /data-sold-out-text=/);
 });
+
+// --- The door has to keep up with a queue ---
+import { indexTickets, ticketByCode } from "../worker/orders.js";
+
+/** A stand-in for Cloudflare KV that counts how many reads a door scan costs. */
+function fakeKV() {
+  const m = new Map();
+  let reads = 0;
+  return {
+    reads: () => reads,
+    get: async (k) => { reads++; return m.has(k) ? m.get(k) : null; },
+    put: async (k, v) => { m.set(k, v); },
+    delete: async (k) => { m.delete(k); },
+  };
+}
+
+test("a door scan is one read, not a walk of every order", async () => {
+  const kv = fakeKV();
+  const env = { STOCK: kv, SESSION_SECRET: "s" };
+  const products = [{ id: "show", title: "Release show", variants: [{ id: "one", title: "Ticket" }], show: { date: "2099-01-01", capacity: 300 } }];
+  await kv.put("catalogue", JSON.stringify(products));
+
+  // 300 orders, two tickets each: a sold-out 600-cap room.
+  for (let i = 0; i < 300; i++) await indexTickets(env, { id: `o${i}`, items: "show:one:2" });
+
+  const code = await ticketCode("s", "o217", "show:one:1");
+  const before = kv.reads();
+  const hit = await ticketByCode(env, code);
+  const cost = kv.reads() - before;
+
+  assert.equal(hit.order, "o217", "the code finds its own order");
+  assert.equal(hit.seq, "show:one:1");
+  assert.equal(cost, 1, `a scan cost ${cost} reads; it must be 1, or the queue waits`);
+});
+
+test("a code that was never sold is not a ticket", async () => {
+  const kv = fakeKV();
+  const env = { STOCK: kv, SESSION_SECRET: "s" };
+  await kv.put("catalogue", JSON.stringify([{ id: "show", title: "x", variants: [{ id: "one", title: "T" }], show: { date: "2099-01-01" } }]));
+  await indexTickets(env, { id: "o1", items: "show:one:1" });
+  assert.equal(await ticketByCode(env, "ZZZZ-9999"), null);
+});
+
+test("a ticket code is found however it is typed", async () => {
+  const kv = fakeKV();
+  const env = { STOCK: kv, SESSION_SECRET: "s" };
+  await kv.put("catalogue", JSON.stringify([{ id: "show", title: "x", variants: [{ id: "one", title: "T" }], show: { date: "2099-01-01" } }]));
+  await indexTickets(env, { id: "o1", items: "show:one:1" });
+  const code = await ticketCode("s", "o1", "show:one:0");
+  for (const typed of [code, code.toLowerCase(), code.replace("-", ""), ` ${code} `, code.replace("-", " ")]) {
+    assert.ok(await ticketByCode(env, typed), `door staff typed "${typed}" and it was not found`);
+  }
+});

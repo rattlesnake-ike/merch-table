@@ -1,4 +1,4 @@
-import { listOrders, getOrder, markShipped, orderRows, trackingUrl } from "./orders.js";
+import { listOrders, getOrder, markShipped, orderRows, trackingUrl, ticketByCode, backfillTicketIndex } from "./orders.js";
 import { isTicket, ticketProducts, ticketsForOrder, verifyCode, admit, usedAt, showOver } from "./tickets.js";
 /* The band's own admin: sign in by emailed link, edit products on a phone, save, done.
    No GitHub, no files, no terminal. Live edits go to KV and the Worker serves them
@@ -237,9 +237,18 @@ async function doorScreen(req, env, url, store, products, me, demo) {
   const code = String(f.get("code") ?? "");
   if (demo) return page(await form(`<div class="warn"><p class="big">Demo</p><p>A real door would check that code against the tickets sold.</p></div>`));
 
-  // Find the one ticket this code belongs to.
-  const orders = await listOrders(env, 1000);
-  for (const o of orders) {
+  // Find the one ticket this code belongs to. The index makes that a single read; the walk
+  // below is the fallback for a store whose orders predate the index. A door queue cannot wait
+  // on hundreds of sequential reads per scan.
+  let hit = await ticketByCode(env, code);
+  if (!hit) {
+    // First scan on a store whose orders predate the index, or after the catalogue changed:
+    // build it once, then try again. Costs one slow scan, never a second one.
+    await backfillTicketIndex(env, products);
+    hit = await ticketByCode(env, code);
+  }
+  const candidates = hit ? [await getOrder(env, hit.order)].filter(Boolean) : await listOrders(env, 1000);
+  for (const o of candidates) {
     for (const t of await ticketsForOrder(env, o, products)) {
       if (!(await verifyCode(env.SESSION_SECRET ?? "unset", o.id, t.seq, code))) continue;
       const show = t.product.show;

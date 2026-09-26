@@ -6,7 +6,14 @@
 
 import { escapeHtml } from "./admin.js";
 
-const K = { order: (id) => `order:${id}`, index: "orders:index" };
+const K = {
+  order: (id) => `order:${id}`,
+  index: "orders:index",
+  // A door scan must be ONE read, not a walk of every order. The code itself is the key.
+  // Without this a 600-ticket show reads ~300 orders sequentially per scan — seconds of KV
+  // latency while a queue waits outside in the cold.
+  ticket: (code) => `tcode:${String(code).toUpperCase().replace(/[^0-9A-Z]/g, "")}`,
+};
 
 /** Everything the band and the bank need, kept small and readable. */
 export async function recordOrder(env, session) {
@@ -34,6 +41,42 @@ export async function recordOrder(env, session) {
   await env.STOCK.put(K.order(session.id), JSON.stringify(o));
   const idx = JSON.parse((await env.STOCK.get(K.index)) ?? "[]");
   if (!idx.includes(session.id)) { idx.unshift(session.id); await env.STOCK.put(K.index, JSON.stringify(idx.slice(0, 2000))); }
+  await indexTickets(env, o);
+}
+
+/**
+ * Point every ticket code at its own order, so the door is one read.
+ * Called when an order is recorded; `backfillTicketIndex` catches orders taken before this existed.
+ */
+export async function indexTickets(env, order) {
+  if (!env.STOCK) return 0;
+  const { ticketsForOrder, isTicket } = await import("./tickets.js");
+  const products = JSON.parse((await env.STOCK.get("catalogue")) ?? "null") ?? null;
+  if (!products) return 0;                       // no catalogue cached: the door falls back to the walk
+  if (!products.some(isTicket)) return 0;        // no shows in this store, nothing to index
+  let n = 0;
+  for (const t of await ticketsForOrder(env, order, products)) {
+    await env.STOCK.put(K.ticket(t.code), JSON.stringify({ order: order.id, seq: t.seq }), { expirationTtl: 400 * 24 * 3600 });
+    n++;
+  }
+  return n;
+}
+
+/** One order + seq for a code, or null when the code was never sold (or predates the index). */
+export async function ticketByCode(env, code) {
+  if (!env.STOCK) return null;
+  const raw = await env.STOCK.get(K.ticket(code));
+  return raw ? JSON.parse(raw) : null;
+}
+
+/** Index every ticket in every order on file. Run once after upgrading, and after a catalogue change. */
+export async function backfillTicketIndex(env, products) {
+  if (!env.STOCK) return { orders: 0, tickets: 0 };
+  await env.STOCK.put("catalogue", JSON.stringify(products));
+  const orders = await listOrders(env, 2000);
+  let tickets = 0;
+  for (const o of orders) tickets += await indexTickets(env, o);
+  return { orders: orders.length, tickets };
 }
 
 export async function listOrders(env, limit = 200) {
