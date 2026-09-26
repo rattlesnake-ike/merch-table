@@ -350,7 +350,7 @@ test("a ticket is not posted: a ticket-only cart asks for no shipping address", 
   assert.match(src, /\.\.\.\(allTickets \? \{\} : \{/, "shipping_address_collection must be conditional");
 
   const site = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
-  assert.match(site, /const allTickets = cart\.every\(\(i\) => i\.ticket\)/, "the cart must know too");
+  assert.match(site, /const allTickets = cart\.length > 0 && cart\.every\(isTicketItem\)/, "the cart must know too");
   assert.match(site, /Nothing to post/, "the cart should say so rather than leave the row blank");
 
   const tpl = readFileSync(new URL("../src/templates.mjs", import.meta.url), "utf8");
@@ -362,4 +362,16 @@ test("a cart with a shirt in it still collects a shipping address", () => {
   // The guard is `every`, not `some` — one physical item and the whole order ships.
   const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
   assert.ok(!/body\.items\.some\(.*isTicket/.test(src), "must be every(), or a shirt would ship nowhere");
+});
+
+test("a cart saved before tickets existed still isn't charged postage", () => {
+  // Isaac's bug: the cart decided from a flag written at add-to-cart time, so a basket saved
+  // before that flag existed looked like merchandise and charged $6 to post a ticket.
+  // It now decides from the CURRENT product list the page publishes.
+  const site = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
+  assert.match(site, /window\.__tickets \|\| \[\]/, "the cart must read the live ticket list");
+  assert.match(site, /i\.ticket === true/, "the saved flag stays as a fallback, not the source of truth");
+
+  const build = readFileSync(new URL("../src/build.mjs", import.meta.url), "utf8");
+  assert.match(build, /window\.__tickets=/, "the build must publish which products are tickets");
 });

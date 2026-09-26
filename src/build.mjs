@@ -91,7 +91,7 @@ if (look.font && !FONTS[look.font]) {
   else console.warn(`store.json asks for the font "${look.font}", but public/fonts/fonts.css does not exist, so nothing declares it. Copy public/fonts/fonts.css.example to public/fonts/fonts.css and edit it. (See BRAND.md.)`);
 }
 write("site.css", css);
-const js = `window.__store=${JSON.stringify({ currency: store.currency.toUpperCase(), locale: store.locale ?? "en-US" })};window.__shipping=${JSON.stringify(store.shipping.map(({ id, name, countries, amount, free_over, estimate }) => ({ id, name, countries, amount, free_over, estimate })))};\n` + readFileSync(join(root, "src/site.js"), "utf8");
+const js = `window.__store=${JSON.stringify({ currency: store.currency.toUpperCase(), locale: store.locale ?? "en-US" })};window.__shipping=${JSON.stringify(store.shipping.map(({ id, name, countries, amount, free_over, estimate }) => ({ id, name, countries, amount, free_over, estimate })))};window.__tickets=${JSON.stringify(products.filter((p) => p.show?.date).map((p) => p.id))};\n` + readFileSync(join(root, "src/site.js"), "utf8");
 write("site.js", js);
 
 // Anything in ./public is copied as-is (fonts, extra pages, a logo).

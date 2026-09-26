@@ -93,7 +93,13 @@
       rows.innerHTML = cart.map((i, n) => `<tr><td>${i.image ? `<img src="/${esc(i.image)}" alt="">` : ""}<a href="/products/${encodeURIComponent(i.product)}/">${esc(i.title)}</a>${i.vtitle && i.vtitle !== "One size" ? ` <small>${esc(i.vtitle)}</small>` : ""}${i.ship ? `<br><small>Pre-order, ships ${esc(i.ship)}</small>` : ""}<button class="rm" data-rm="${n}" type="button">Remove</button></td><td class="num">${fmt(i.price)}</td><td><input type="number" min="1" max="10" value="${Number(i.qty) || 1}" data-qty="${n}" aria-label="Quantity"></td><td class="num">${fmt(i.price * i.qty)}</td></tr>`).join("");
       const sub = cart.reduce((a, i) => a + i.price * i.qty, 0);
       // Tickets are collected at a door. A cart of only tickets must not ask where to post them.
-      const allTickets = cart.every((i) => i.ticket);
+      //
+      // Decided from the CURRENT product list, not from a flag saved when the item was added.
+      // A cart saved before this shipped has no flag, and trusting it charged postage on a
+      // ticket — which is exactly the bug Isaac hit. `i.ticket` is still honoured as a
+      // fallback for a product that has since left the store.
+      const isTicketItem = (i) => (window.__tickets || []).includes(i.product) || i.ticket === true;
+      const allTickets = cart.length > 0 && cart.every(isTicketItem);
       const shipField = document.querySelector("[data-ship-field]");
       if (shipField) shipField.hidden = allTickets;
       const r = allTickets ? null : ship();
