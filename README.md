@@ -87,13 +87,29 @@ Then set `SITE_URL` in `wrangler.jsonc` to `https://shop.yourband.com` and push.
 
 ---
 
-## Day to day
+## Day to day: the admin
+
+Most days you don't touch a file. Go to **`your-store-address/admin`** on your phone, sign in with a link we email you, tap a product, change it, save. It's live straight away.
+
+To turn it on, three things:
+
+1. In `store.json`, list who may sign in: `"owners": ["you@yourband.com"]`. Only these addresses, ever.
+2. Add a Worker setting `SESSION_SECRET` with any long random string.
+3. Create the storage the admin writes to, once: `npx wrangler kv namespace create STOCK`, then paste the id it prints into `wrangler.jsonc` under `kv_namespaces` and push.
+
+For the sign-in emails to arrive, add a [Resend](https://resend.com) API key as `RESEND_API_KEY` and set `MAIL_FROM` to an address at your domain. Without it the store still works; the link is written to the Worker's log instead, which you can read in the Cloudflare dashboard.
+
+**What the admin can do:** change a price, rename a product, edit its description, mark any size sold out or back in, set or clear a pre-order ship date, and hide a product from the store. Everything else is still a file edit and a push.
+
+**How it's kept safe:** the sign-in link works once, expires in fifteen minutes, and can never be used as a session by itself. Someone who isn't an owner gets the identical "check your email" response, so the store can't be used to find out who runs it. Saves are refused unless they come from your own store, and every form carries a token tied to your session.
+
+## Day to day: files
 
 | To… | Do this |
 |---|---|
 | Add a product | Add an entry to `products.json` (copy an existing one). Put the image in `images/`. `npm run check`, commit, push. |
-| Change a price | Edit `price` (cents). Push. |
-| Mark a size sold out | Set that variant's `"available": false`. Push. Or give variants a `"stock"` number and let the count do it. |
+| Change a price | The admin, or edit `price` (cents) and push. |
+| Mark a size sold out | The admin, or set that variant's `"available": false` and push. Or give variants a `"stock"` number and let the count do it. |
 | Run a pre-order | Add `"ship_date": "2026-11-13"`. The page, cart and receipt say when it ships. |
 | Run a drop | Add `"live_at": "2026-11-13T20:00:00-05:00"`. The page shows the date and time and opens itself at that moment. Nobody can check out before it. |
 | Sell a bundle | Add `"bundle": [{"product":"lp","variant":"green"},{"product":"tee","variant":"*"}]`. `*` means the fan's chosen variant. When it sells, the parts' stock counts move. |
@@ -118,7 +134,8 @@ src/build.mjs     builds dist/ from the JSON (node, no dependencies)
 src/templates.mjs the HTML of every page
 src/site.css      the stylesheet
 src/site.js       cart, size picker, drops, stock, checkout hand-off
-worker/index.js   the server: /api/checkout, /api/session, /api/stock, /api/restock, /api/webhook, /api/wants
+worker/index.js   the server: /api/checkout, /api/session, /api/stock, /api/restock, /api/webhook, /api/wants, /api/setup
+worker/admin.js   the band's admin: sign-in links, the product editor
 scripts/          import-shopify.mjs, check.mjs
 ```
 
@@ -134,6 +151,8 @@ scripts/          import-shopify.mjs, check.mjs
 ## Limits, honestly
 
 - Stock counting needs the optional KV namespace and webhook (step 6.4). Without them, sold out is whatever you set in `products.json`.
+- The admin needs that same KV namespace and a `SESSION_SECRET`. Without them it tells you so rather than half-working.
+- The admin edits products, not the shape of the store. Adding a product, changing shipping prices or editing the design is still a file and a push (or a coding agent).
 - Up to 10 of one item per order and 50 lines per cart; Stripe allows 100.
 - Shipping is a flat rate per region. Weight-based rates would need code.
 - Stripe Tax (0.5% per transaction) does the tax maths if you turn `tax.automatic` on and have registered in Stripe; filing is still yours.
