@@ -78,9 +78,18 @@ const radius = look.corners === "round" ? "10px" : look.corners === "soft" ? "4p
 const headingCase = look.headings === "normal" ? "none" : look.headings === "small-caps" ? "lowercase" : "uppercase";
 // Appended, not prepended: in CSS the last declaration wins, so the band's values must come after the defaults.
 let css = readFileSync(join(root, "src/site.css"), "utf8");
+// Appended last, so it wins over the stylesheet's defaults. Anything YOU write in site.css
+// after this point in the cascade still wins over these, because this block is inserted
+// BEFORE your own additions below. See BRAND.md, "what the build adds".
 css += `\n/* the band's look, from store.json */\n:root{--ink:${store.colors?.ink ?? "#141416"};--paper:${store.colors?.paper ?? "#f3f1ea"};--accent:${store.colors?.accent ?? "#2743d0"};--radius:${radius};--display:${face};--body:${face}}\n`;
-css += `h1,h2,h3{text-transform:${headingCase}}\n.card,.btn,input,select,textarea,.restock,.sz{border-radius:var(--radius)}\n`;
-if (look.font && !FONTS[look.font] && existsSync(join(root, "public/fonts"))) css = `/* self-hosted face declared in public/fonts/fonts.css */\n@import "/fonts/fonts.css";\n` + css;
+// These two lines are a convenience for bands who only want the settings. If you are
+// restyling properly, set "look": { "raw": true } in store.json and they are not added,
+// so nothing of yours gets overridden.
+if (!look.raw) css += `h1,h2,h3{text-transform:${headingCase}}\n.card,.btn,input,select,textarea,.restock,.sz{border-radius:var(--radius)}\n`;
+if (look.font && !FONTS[look.font]) {
+  if (existsSync(join(root, "public/fonts/fonts.css"))) css = `/* your face, declared in public/fonts/fonts.css */\n@import "/fonts/fonts.css";\n` + css;
+  else console.warn(`store.json asks for the font "${look.font}", but public/fonts/fonts.css does not exist, so nothing declares it. Copy public/fonts/fonts.css.example to public/fonts/fonts.css and edit it. (See BRAND.md.)`);
+}
 write("site.css", css);
 const js = `window.__store=${JSON.stringify({ currency: store.currency.toUpperCase(), locale: store.locale ?? "en-US" })};window.__shipping=${JSON.stringify(store.shipping.map(({ id, name, countries, amount, free_over, estimate }) => ({ id, name, countries, amount, free_over, estimate })))};\n` + readFileSync(join(root, "src/site.js"), "utf8");
 write("site.js", js);

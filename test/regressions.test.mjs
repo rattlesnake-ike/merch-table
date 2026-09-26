@@ -112,3 +112,31 @@ test("capacity counts down", () => {
   assert.equal(ticketsLeft({ show: { capacity: 120 } }, 200), 0, "never negative");
   assert.equal(ticketsLeft({ show: {} }, 5), null, "no capacity set means no limit");
 });
+
+const siteJs = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
+const buildMjs = readFileSync(new URL("../src/build.mjs", import.meta.url), "utf8");
+
+test("a sold-out product says so once, not twice", () => {
+  // Two code paths used to insert the message; only one guarded against a duplicate.
+  assert.equal((siteJs.match(/className = "soldout"/g) ?? []).length, 1, "only one place may create the sold-out line");
+  assert.match(siteJs, /if \(!\$\(".soldout", prod\)\)/, "and it must check the line isn't already there");
+});
+
+test("the class names the script depends on are documented in the file that depends on them", () => {
+  const header = siteJs.slice(0, siteJs.indexOf("(() =>"));
+  for (const hook of [".sz", ".buy", ".soldout", "data-variant", "data-cart-rows"]) assert.ok(header.includes(hook), `${hook} must be listed as a hook a restyle has to keep`);
+});
+
+test("a band restyling properly can switch off the rules the build appends", () => {
+  assert.match(buildMjs, /if \(!look\.raw\) css \+=/, "look.raw must skip the appended heading and corner rules");
+});
+
+test("a missing font file is reported, never silently ignored", () => {
+  assert.match(buildMjs, /public\/fonts\/fonts\.css/, "the build must look for the file, not just the folder");
+  assert.match(buildMjs, /console\.warn/, "and say so when it isn't there");
+});
+
+test("the sold-out wording is changeable without editing the script", () => {
+  assert.match(siteJs, /prod\.dataset\.soldOutText/);
+  assert.match(readFileSync(new URL("../src/templates.mjs", import.meta.url), "utf8"), /data-sold-out-text=/);
+});

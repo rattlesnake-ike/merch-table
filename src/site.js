@@ -1,5 +1,17 @@
 /* The whole front-end: a cart in localStorage, the size picker, drops that open themselves,
-   live stock, back-in-stock requests, and the hand-off to checkout. No framework, no tracking. */
+   live stock, back-in-stock requests, and the hand-off to checkout. No framework, no tracking.
+
+   RESTYLING? These are the hooks this file needs. Everything else is yours.
+     data- attributes:  data-product, data-add, data-add-btn, data-added, data-restock,
+                        data-restock-msg, data-variant, data-price, data-price-display,
+                        data-cart-rows, data-cart-empty, data-cart-full, data-cart-count,
+                        data-subtotal, data-shipping, data-total, data-ship-note,
+                        data-checkout, data-checkout-btn, data-checkout-err, data-rm,
+                        data-qty, data-order, data-thanks-line, data-drop, data-live-at
+     class names:       .sz and .sz.out (a size), .buy (where the sold-out line is put),
+                        .soldout (the sold-out line itself)
+     structure:         a .sz label contains one <input> and one <span> holding the size name.
+   Rename any of those and something breaks quietly. Style them however you like. */
 (() => {
   const KEY = "cart";
   const $ = (s, r = document) => r.querySelector(s);
@@ -45,18 +57,29 @@
       tick();
     }
     // Live stock: grey out what the count says is gone (only where the store counts stock).
+    /* The one place that decides what a sold-out product looks like. Both callers use it, so
+       the message can never be added twice, however many times stock news arrives. */
     const markSoldOut = (list) => {
       if (!list || !list.length) return;
       for (const v of list) { const lab = $(`[data-variant="${v}"]`, prod); if (!lab || lab.classList.contains("out")) continue; lab.classList.add("out"); const inp = $("input", lab); inp.disabled = true; inp.checked = false; lab.insertAdjacentHTML("beforeend", '<s aria-hidden="true"></s><span class="vis">sold out</span>'); }
-      if (radios.every((r) => r.disabled)) { if (form) form.hidden = true; if (!$(".soldout", prod)) { const so = document.createElement("p"); so.className = "soldout"; so.textContent = "Sold out."; $(".buy", prod).insertBefore(so, restock); } if (restock) restock.hidden = false; }
+      if (radios.every((r) => r.disabled)) {
+        if (form) form.hidden = true;
+        if (!$(".soldout", prod)) {
+          const so = document.createElement("p");
+          so.className = "soldout";
+          // The wording lives on the page, so a band can change it without touching this file.
+          so.textContent = prod.dataset.soldOutText || "Sold out.";
+          ($(".buy", prod) || prod).insertBefore(so, restock);
+        }
+        if (restock) restock.hidden = false;
+      }
       sync();
     };
     if (Array.isArray(window.__soldOut)) markSoldOut(window.__soldOut);
     fetch(`/api/stock?product=${encodeURIComponent(prod.dataset.product)}`).then((r) => (r.ok ? r.json() : null)).then((s) => {
       if (!s || !s.soldOut) return;
       for (const v of s.soldOut) { const lab = $(`[data-variant="${v}"]`, prod); if (!lab || lab.classList.contains("out")) continue; lab.classList.add("out"); const inp = $("input", lab); inp.disabled = true; inp.checked = false; lab.insertAdjacentHTML("beforeend", '<s aria-hidden="true"></s><span class="vis">sold out</span>'); }
-      if (radios.every((r) => r.disabled)) { if (form) form.hidden = true; prod.insertAdjacentHTML("beforeend", ""); const so = document.createElement("p"); so.className = "soldout"; so.textContent = "Sold out."; $(".buy", prod).insertBefore(so, restock); if (restock) restock.hidden = false; }
-      sync();
+      markSoldOut(s.soldOut);
     }).catch(() => {});
   }
 

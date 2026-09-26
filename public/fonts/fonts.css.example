@@ -1,0 +1,15 @@
+/* Copy this file to fonts.css and edit it. Then set "font": "YourFace" in store.json. */
+@font-face {
+  font-family: "YourFace";
+  src: url("/fonts/yourface.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "YourFace";
+  src: url("/fonts/yourface-bold.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}

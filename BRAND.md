@@ -25,8 +25,8 @@ Your logo: put an SVG at `brand/favicon.svg`.
 
 A face nobody else has is the fastest way to stop looking like a template.
 
-1. Put the `.woff2` files in `public/fonts/`.
-2. Make `public/fonts/fonts.css`:
+1. Put the `.woff2` files in `public/fonts/` (the folder is there, with a README and an example).
+2. Copy `public/fonts/fonts.css.example` to `public/fonts/fonts.css` and edit it:
 
 ```css
 @font-face { font-family: "YourFace"; src: url("/fonts/yourface.woff2") format("woff2"); font-weight: 400; font-display: swap; }
@@ -38,6 +38,9 @@ A face nobody else has is the fastest way to stop looking like a template.
 It stays fast because the file is served from your own domain and nothing is fetched from
 Google or anyone else. Check you have the right to use the face commercially.
 
+If the name in `store.json` isn't one of the presets and `public/fonts/fonts.css` is
+missing, `npm run build` says so rather than quietly falling back.
+
 ## 3. Rebuild it however you want (an afternoon, with an agent)
 
 `src/templates.mjs` is every page as a plain function returning a string. There is no
@@ -48,13 +51,36 @@ The pages are `indexPage`, `productPage`, `cartPage`, `thanksPage`, `shippingPag
 `notFoundPage`. The data handed to them is exactly what's in `store.json` and
 `products.json`.
 
+### What the build adds to your CSS
+
+`npm run build` appends a few lines *after* your stylesheet, built from `store.json`:
+
+```css
+:root{--ink:…;--paper:…;--accent:…;--radius:…;--display:…;--body:…}
+h1,h2,h3{text-transform:uppercase}          /* from look.headings */
+.card,.btn,input,select,textarea,.restock,.sz{border-radius:var(--radius)}
+```
+
+Because they come last, they beat anything you wrote on a plain `:root` or a bare
+`h1,h2,h3`. That is deliberate when you only want the settings, and in the way when you're
+properly restyling. **If you're restyling, set `"look": { "raw": true }` in `store.json`** —
+the heading and corner rules are then not added at all, and only the custom properties
+remain, which you can override in `:root` as normal.
+
 **Rules worth keeping** when you or an agent rewrite the look, because they are why the
 store is fast, private and hard to break:
 
 - No third-party scripts, fonts or pixels. The Content-Security-Policy in `src/build.mjs`
   enforces it; if something needs loosening, you are usually adding a tracker.
-- Keep `data-` attributes on the buy form and the cart. The script finds things by those,
-  not by class name, so you can restyle freely without breaking the cart.
+- **Keep the hooks the script needs.** Mostly `data-` attributes, but three class names are
+  load-bearing too: `.sz` (a size button) and `.sz.out` (a sold-out one), `.buy` (where the
+  sold-out line gets inserted), and `.soldout` (that line). Inside a `.sz` label the script
+  expects one `<input>` and one `<span>` holding the size name. The full list is in a comment
+  at the top of `src/site.js`. Style all of them however you want; just don't rename them.
+  Rename one and the cart or the sold-out handling breaks silently.
+- **Test a sold-out product.** The shipped sample data has none fully sold out, so the code
+  path is easy to miss. Set every variant of one product to `"available": false`, rebuild,
+  and look at its page before you call the job done.
 - Prices are always formatted through `money()`, never hand-written.
 - Keep the page working at 390 pixels wide. Most fans are on a phone.
 
@@ -94,7 +120,23 @@ something that looks like you rather than something that looks like software.
 > themselves. Build it the way the other pages are built, in `src/templates.mjs` and
 > `src/build.mjs`.
 
+### Things that will trip you up
+
+- **Rotating a full-width element causes sideways scrolling** on a phone. Rotate
+  inline-block elements instead, or give the parent `overflow: hidden`. Check
+  `document.documentElement.scrollWidth` is still 390 at 390px wide.
+- **The cart is a four-column table.** It survives narrow screens because `.num` sets
+  `white-space: nowrap`. Restyle `td` carefully, or change the markup to a list.
+- **Inline SVG as a `data:` URI is allowed** by the store's Content-Security-Policy, so
+  textures and patterns are available without adding an image file or a third-party asset.
+- **A product card is a single `<a>`** with `.im`, `.t` and `.row` inside. For a stamp or
+  band across the image, use `::after` on `.im`.
+- **The sold-out wording** comes from `"sold_out_text"` in `store.json`, so you can change
+  it without editing `src/site.js`.
+
 ### If you break it
 
 `git checkout src/templates.mjs src/site.css` puts the look back exactly as it shipped.
-Your products and settings are in different files and are never touched by that.
+Your products and settings are in different files and are never touched by that. If you
+downloaded the store rather than cloning it, keep your own copy of those two files before
+you start.
