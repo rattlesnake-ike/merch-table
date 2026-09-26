@@ -388,3 +388,28 @@ test("a cart row keeps its shape when an item has a pre-order date", () => {
   assert.match(css, /\.cart \.ci\{display:flex/, "the row needs to be a flex row");
   assert.match(css, /\.cart \.ci-t\{min-width:0\}/, "min-width:0 or a long title refuses to wrap");
 });
+
+import { csrfToken } from "../worker/admin.js";
+
+test("a missing session secret doesn't take the page down with it", async () => {
+  // The product page returned 500 on the demo for days: csrfToken threw on a session with no
+  // email, so the page could not be rendered at all. A band clicking a product saw nothing.
+  // It now returns "" and the POST side refuses the save instead.
+  assert.equal(await csrfToken(undefined, { email: "a@b.com" }), "", "no secret → no token, no throw");
+  assert.equal(await csrfToken("s", {}), "", "no session email → no token, no throw");
+  assert.equal(await csrfToken("s", null), "", "no session at all → no token, no throw");
+  const real = await csrfToken("a-real-secret", { email: "a@b.com" });
+  assert.equal(real.length, 24, "a real session still gets a real token");
+  const other = await csrfToken("a-real-secret", { email: "someone@else.com" });
+  assert.notEqual(real, other, "two sessions must not share a token");
+});
+
+test("every admin form guards its csrf call for demo mode", () => {
+  const src = readFileSync(new URL("../worker/admin.js", import.meta.url), "utf8");
+  const calls = [...src.matchAll(/csrfToken\(env\.SESSION_SECRET, me\)/g)];
+  assert.ok(calls.length >= 5, "expected several csrf call sites");
+  for (const m of calls) {
+    const line = src.slice(src.lastIndexOf("\n", m.index) + 1, src.indexOf("\n", m.index));
+    assert.match(line, /demo/, `unguarded csrf call would 500 a demo:\n  ${line.trim().slice(0, 100)}`);
+  }
+});

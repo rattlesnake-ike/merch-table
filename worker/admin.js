@@ -39,7 +39,18 @@ const cookie = (req, name) => (req.headers.get("cookie") ?? "").split(";").map((
 /** Who may sign in: the addresses in store.json's `owners`, nobody else. */
 const owners = (store) => (store.owners ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean);
 
-export async function csrfToken(secret, session) { return (await hmac(secret, `csrf:${session.email}:${session.gen ?? 0}`)).slice(0, 24); }
+/**
+ * A token tying this form to this session.
+ *
+ * Returns "" when there is nothing to sign with — a demo, or a store whose SESSION_SECRET is
+ * not set yet. It used to throw, which took down the whole product page with a 500 instead of
+ * degrading. A page a band cannot open is worse than a form without a token on a store that
+ * cannot save anything anyway; the POST side checks `demo` before trusting what comes back.
+ */
+export async function csrfToken(secret, session) {
+  if (!secret || !session?.email) return "";
+  return (await hmac(secret, `csrf:${session.email}:${session.gen ?? 0}`)).slice(0, 24);
+}
 
 export async function currentAdmin(req, env, store) {
   if (!env.SESSION_SECRET) return null;
@@ -157,7 +168,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
 
     if (req.method === "POST") {
       const form = await req.formData();
-      if (!timingSafeEqual(String(form.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<h1>That form had gone stale</h1><p>Open the product again and make the change once more. <a href="/admin/p/${encodeURIComponent(id)}">Back</a></p>`, 403);
+      if (!demo && !timingSafeEqual(String(form.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<h1>That form had gone stale</h1><p>Open the product again and make the change once more. <a href="/admin/p/${encodeURIComponent(id)}">Back</a></p>`, 403);
       const next = structuredClone(p);
       const cents = parsePrice(form.get("price"));
       if (cents === null) return html(`<h1>That price didn&rsquo;t look right</h1><p>Use a plain number, like <b>25</b> or <b>25.00</b>, and no more than ${money(MAX_PRICE, store)}. <a href="/admin/p/${encodeURIComponent(id)}">Back</a></p>`, 400);
@@ -175,7 +186,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
 
     const sizes = p.variants.map((v) => `<label class="sw" data-sz><input type="checkbox" name="v_${escapeHtml(v.id)}" ${v.available === false ? "" : "checked"}><span>${escapeHtml(v.title)}</span><small data-state>${v.available === false ? "sold out" : "in stock"}</small></label>`).join("");
     return html(`${adminNav("/admin", { href: "/admin", label: "All products" })}<header class="bar"><h1>${escapeHtml(p.title)}</h1></header>
-      <form method="post"><input type="hidden" name="_t" value="${await csrfToken(env.SESSION_SECRET, me)}">
+      <form method="post"><input type="hidden" name="_t" value="${demo ? "" : await csrfToken(env.SESSION_SECRET, me)}">
         ${p.images?.[0] ? `<img class="hero" src="/${escapeHtml(p.images[0])}" alt="">` : ""}
         <label for="title">Name</label><input id="title" name="title" value="${escapeHtml(p.title)}" required>
         <label for="price">Price</label><div class="money"><span>${store.currency === "usd" ? "$" : store.currency.toUpperCase()}</span><input id="price" name="price" inputmode="decimal" value="${(p.price / 100).toFixed(2)}" required></div>
@@ -282,7 +293,7 @@ async function ordersScreen(req, env, url, store, me, demo) {
   if (req.method === "POST") {
     if (demo) return html(`<h1>This is the demo</h1><p>On your own store this would have saved. <a href="/admin/orders">Back</a></p>`);
     const form = await req.formData();
-    if (!timingSafeEqual(String(form.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<h1>That form had gone stale</h1><p><a href="/admin/orders">Open it again</a>.</p>`, 403);
+    if (!demo && !timingSafeEqual(String(form.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<h1>That form had gone stale</h1><p><a href="/admin/orders">Open it again</a>.</p>`, 403);
     await markShipped(env, String(form.get("id") ?? ""), { carrier: form.get("carrier"), tracking: form.get("tracking"), note: form.get("note") });
     return new Response("", { status: 302, headers: { location: "/admin/orders?saved=1" } });
   }
