@@ -5,6 +5,7 @@ import products from "../products.json" with { type: "json" };
 import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
 import { handleAdmin, currentAdmin } from "./admin.js";
 import { recordOrder, ordersForEmail, orderRows, getOrder, listOrders } from "./orders.js";
+import { paymentUri, qrSvg, COINS } from "./coins.js";
 import { isTicket, ticketProducts, ticketsForOrder, ticketHtml, usedAt, showOver, ticketsLeft, showOff } from "./tickets.js";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -42,6 +43,9 @@ export default {
       // A page the band has edited is patched on the way out, so a save shows at once.
       if (env.STOCK && (url.pathname === "/" || /^\/products\/[^/]+\/?$/.test(url.pathname))) return await patchPage(req, env, url, await liveProducts(env));
       if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, await liveProducts(env));
+      // Paying the band directly, no processor. Only exists if the band put an address in
+      // store.json; otherwise the route is simply not there.
+      if (url.pathname === "/api/coin" && req.method === "POST") return await coinRequest(req, env, url, await liveProducts(env));
       if (url.pathname === "/orders" || url.pathname === "/orders/") return await lookup(req, env, url);
       if (url.pathname.startsWith("/tickets")) return await ticketsPage(req, env, url);
       if (url.pathname === "/api/catalogue") return json({ products: (await liveProducts(env)).filter((p) => !p.hidden && isLive(p)) });
@@ -224,6 +228,65 @@ async function setup(req, env, url, store) {
   // reads as a fault the band has to fix, which is a lie.
   const rows = checks.map((c) => `<tr><td>${c.ok === null ? "\u00b7" : c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
   return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><style>body{font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#141416}h1{font-size:1.6rem}table{border-collapse:collapse;width:100%}td{padding:.6rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{font-size:1.2rem;width:1.6rem}.r{padding:1rem;background:${ready ? "#e8f5e9" : "#fff3e0"};border:1px solid #ccc;margin:1rem 0}</style><h1>Store setup</h1><div class="r"><b>${ready ? "Ready to take orders." : "Not ready yet \u2014 see below."}</b></div><table>${rows}</table><p style="color:#666">Only whoever runs this store can open this page. It shows no customer data and no keys.</p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
+
+/* ---------- Paying the band's own wallet, if they set one up ---------- */
+
+/**
+ * Price the cart the same way checkout does, then hand back an address, an exact amount and a
+ * QR code. The band confirms the money arrived; nothing here watches a chain, and the store
+ * says so to the fan rather than implying it is tracking anything.
+ */
+async function coinRequest(req, env, url, products) {
+  const wallets = store.wallets ?? {};
+  const body = await req.json().catch(() => null);
+  const coin = String(body?.coin ?? "");
+  const address = wallets[coin];
+  if (!address) return bad("This band doesn't take that one.", 404);
+  if (!body || !Array.isArray(body.items) || !body.items.length) return bad("The cart is empty.");
+
+  // Same server-side pricing as a card order: the browser never says what anything costs.
+  let cents = 0;
+  for (const it of body.items.slice(0, 50)) {
+    const p = products.find((x) => x.id === it.product);
+    const v = p?.variants.find((x) => x.id === it.variant);
+    if (!p || !v || p.hidden || !isLive(p)) return bad("Something in the cart isn't on the table any more.");
+    if (isTicket(p) && (showOver(p) || showOff(p))) return bad(`${p.show.title ?? p.title} isn't on sale.`);
+    cents += variantPrice(p, v) * Math.max(1, Math.min(10, Number(it.qty) || 1));
+  }
+  if (!cents) return bad("The cart is empty.");
+
+  // What the coin is worth, from a public price feed. If it can't be reached we refuse rather
+  // than invent a rate — asking a fan for the wrong amount of money is worse than no option.
+  const rate = await coinRate(coin, store.currency ?? "usd");
+  if (!rate) return bad("Couldn't get a price for that right now. Try a card, or try again in a minute.", 503);
+
+  const amount = Number((cents / 100 / rate).toFixed(COINS[coin].decimals));
+  const uri = paymentUri(coin, address, amount);
+  if (!uri) return bad("Couldn't build that payment request.", 500);
+
+  return json({
+    coin, label: COINS[coin].label, unit: COINS[coin].unit,
+    address, amount, uri, qr: qrSvg(uri, 260),
+    fiat: (cents / 100).toFixed(2), currency: (store.currency ?? "usd").toUpperCase(),
+    // Said plainly, because a fan needs to know this is not instant.
+    note: `Send exactly ${amount} ${COINS[coin].unit}. ${store.name} confirms it by hand once it lands, usually within a day. The price is held at today's rate for this order.`,
+    email: store.email ?? null,
+  });
+}
+
+/** A public price, with no account and no key. Refuses rather than guesses. */
+async function coinRate(coin, currency) {
+  const ids = { btc: "bitcoin", ada: "cardano", eth: "ethereum" };
+  const id = ids[coin];
+  if (!id) return null;
+  try {
+    const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=${encodeURIComponent(currency)}`, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const v = j?.[id]?.[currency];
+    return typeof v === "number" && v > 0 ? v : null;
+  } catch { return null; }
 }
 
 /* ---------- Stripe, by plain HTTPS. No SDK to install or update. ---------- */

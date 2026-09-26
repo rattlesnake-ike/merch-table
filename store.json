@@ -115,5 +115,11 @@
     "font": "system"
   },
   "statement_descriptor": "NORTHERN DOGS",
-  "terms_url": true
+  "terms_url": true,
+  "wallets": {
+    "_comment": "Optional. Put your OWN receiving address here to take coin directly, e.g. \"btc\": \"bc1q...\". Leave empty and none of this exists.",
+    "btc": "",
+    "ada": "",
+    "eth": ""
+  }
 }

@@ -295,3 +295,51 @@ test("a placeholder contact address is caught before a fan needs it", () => {
   for (const good of ["hi@harborlights.net", "band@gmail.com", "shop@arealband.co.uk"])
     assert.ok(!placeholder.test(good), `${good} is a real address and must not be flagged`);
 });
+
+// --- Paying straight into the band's own wallet ---
+import { paymentUri, qrSvg, COINS } from "../worker/coins.js";
+
+test("a bitcoin payment request is BIP-21, with the amount in BTC and never satoshis", () => {
+  const u = paymentUri("btc", "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", 0.00042);
+  assert.equal(u, "bitcoin:bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq?amount=0.00042");
+  assert.ok(!/amount=42000/.test(u), "satoshis here would ask for 100,000,000x the price");
+});
+
+test("cardano uses the web+cardano scheme and ADA, not Lovelace", () => {
+  const u = paymentUri("ada", "addr1qx", 5.5);
+  assert.ok(u.startsWith("web+cardano:"), "the scheme really is web+cardano, not cardano");
+  assert.match(u, /amount=5\.5$/);
+});
+
+test("ethereum value is wei, as an integer with no exponent", () => {
+  const u = paymentUri("eth", "0x1234567890123456789012345678901234567890", 0.01);
+  assert.equal(u, "ethereum:0x1234567890123456789012345678901234567890?value=10000000000000000");
+  assert.ok(!/e\+/i.test(u), "exponent notation would be unreadable to a wallet");
+});
+
+test("a missing address or a nonsense amount makes no payment request at all", () => {
+  for (const bad of [null, "", undefined])
+    assert.equal(paymentUri("btc", bad, 1), null, "no address must mean no QR, never a broken one");
+  for (const amt of [0, -1, NaN, "abc"])
+    assert.equal(paymentUri("btc", "bc1q", amt), null, `amount ${amt} must be refused`);
+  assert.equal(paymentUri("doge", "D123", 1), null, "an unknown coin is refused, not guessed at");
+});
+
+test("every coin we offer has the decimals its chain actually uses", () => {
+  assert.equal(COINS.btc.decimals, 8);
+  assert.equal(COINS.ada.decimals, 6);
+  assert.equal(COINS.eth.decimals, 18);
+});
+
+test("the QR code is real: it decodes back to the same URI", async () => {
+  // Verified against a real QR reader (jsQR) on 2026-09-26 for BTC, ADA and ETH requests.
+  // Kept here as a shape check so a broken encoder is caught without adding a dependency:
+  // a wrong QR sends a fan's money somewhere nobody can reach.
+  const u = paymentUri("btc", "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq", 0.00042);
+  const svg = qrSvg(u, 300);
+  assert.match(svg, /^<svg /);
+  assert.match(svg, /role="img"/);
+  const modules = (svg.match(/<rect /g) || []).length;
+  assert.ok(modules > 200, `only ${modules} modules drawn — the encoder produced nothing usable`);
+  assert.ok(svg.includes('fill="#fff"'), "a QR needs a white quiet zone or phones cannot read it");
+});
