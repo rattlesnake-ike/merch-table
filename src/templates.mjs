@@ -30,7 +30,7 @@ ${extraHead}
 <header class="top">
   <a class="wm" href="/">${esc(store.name)}</a>
   <nav aria-label="Store">
-    ${(store.links ?? []).map((l) => `<a href="${esc(l.url)}" rel="noopener">${esc(l.label)}</a>`).join("")}
+    ${(store.links ?? []).map((l) => `<a href="${esc(l.url)}"${/^https?:/i.test(l.url) ? ' target="_blank" rel="noopener"' : ' rel="noopener"'}>${esc(l.label)}</a>`).join("")}
     <a href="/cart/" class="cartlink" data-cart-link>Cart <span data-cart-count aria-live="polite"></span></a>
   </nav>
 </header>
