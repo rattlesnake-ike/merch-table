@@ -285,3 +285,13 @@ test("a ticket's own variant price wins over the product price", () => {
   const order = { id: "o3", items: "show:early:2", paid: true, payment: "pi_3" };
   assert.equal(ticketAmountFor(order, "show", products), 2400, "early-bird buyers get back what they actually paid");
 });
+
+test("a placeholder contact address is caught before a fan needs it", () => {
+  const src = readFileSync(new URL("../scripts/check.mjs", import.meta.url), "utf8");
+  assert.match(src, /placeholder/, "check.mjs must test the store's contact address");
+  const placeholder = /(^|@)(example\.(com|org|net)|yourband|changeme)/i;
+  for (const bad of ["hello@example.com", "band@example.org", "you@yourband.com", "changeme@x.com"])
+    assert.ok(placeholder.test(bad), `${bad} should be caught`);
+  for (const good of ["hi@harborlights.net", "band@gmail.com", "shop@arealband.co.uk"])
+    assert.ok(!placeholder.test(good), `${good} is a real address and must not be flagged`);
+});
