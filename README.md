@@ -80,6 +80,8 @@ Three lines in `store.json` change the whole look. No CSS needed:
 
 Your logo goes in `brand/favicon.svg`. Beyond that, `src/site.css` is the whole stylesheet, about 150 lines, and yours to edit.
 
+**To make it properly yours** — your own typeface, your own layout, a store that looks like your record and nothing like a template — see **[BRAND.md](BRAND.md)**. It has the settings, how to self-host a face, and prompts to hand a coding agent.
+
 If you use a coding agent (Claude Code, Codex, Cursor), open it in this folder and ask for what you want: "make the front page look like our album art in `brand/`", "add a second image to every product", "add a page for tour dates". Everything is plain HTML, CSS and JavaScript.
 
 ### 5. Your domain
