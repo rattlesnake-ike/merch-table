@@ -3,7 +3,7 @@
 import store from "../store.json" with { type: "json" };
 import products from "../products.json" with { type: "json" };
 import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
-import { handleAdmin } from "./admin.js";
+import { handleAdmin, currentAdmin } from "./admin.js";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, status);
@@ -40,14 +40,15 @@ export default {
       // A page the band has edited is patched on the way out, so a save shows at once.
       if (env.STOCK && (url.pathname === "/" || /^\/products\/[^/]+\/?$/.test(url.pathname))) return await patchPage(req, env, url, await liveProducts(env));
       if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, await liveProducts(env));
-      if (url.pathname === "/api/catalogue") return json({ products: await liveProducts(env) });
+      if (url.pathname === "/api/catalogue") return json({ products: (await liveProducts(env)).filter((p) => !p.hidden && isLive(p)) });
       if (url.pathname === "/api/session" && req.method === "GET") return await session(env, url);
       if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url, await liveProducts(env));
       if (url.pathname === "/api/restock" && req.method === "POST") return await restock(req, env, await liveProducts(env));
       if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
       if (url.pathname === "/api/wants" && req.method === "GET") return await wants(env, url);
-      if (url.pathname === "/api/setup") return await setup(env, url);
-      if (url.pathname === "/api/health") return json({ ok: true, products: products.length, stripe: !!env.STRIPE_SECRET_KEY, live: (env.STRIPE_SECRET_KEY || "").startsWith("sk_live_"), stock: !!env.STOCK });
+      if (url.pathname === "/api/setup") return await setup(req, env, url, store);
+      // Deliberately says nothing about the band's Stripe account: this is world-readable.
+      if (url.pathname === "/api/health") return json({ ok: true, products: products.filter((p) => !p.hidden).length });
       return bad("Not found", 404);
     } catch (e) {
       if (e instanceof StripeError) return bad(e.message, e.status);
@@ -117,7 +118,13 @@ async function patchPage(req, env, url, live) {
 }
 
 /* ---------- GET /api/setup : is this store actually ready to take money? ---------- */
-async function setup(env, url) {
+async function setup(req, env, url, store) {
+  // The setup page names the band's Stripe account and says whether real money is switched
+  // on, so it is for the band, not the public: an owner session or the admin key.
+  const key = url.searchParams.get("key") ?? "";
+  const byKey = env.ADMIN_KEY && timingSafeEqual(key, env.ADMIN_KEY);
+  const bySession = env.DEMO_ADMIN === "1" || (await currentAdmin(req, env, store).catch(() => null));
+  if (!byKey && !bySession) return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><body style="font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem"><h1 style="font-size:1.4rem">This page is for whoever runs the store</h1><p>Open it while signed in at <a href="/admin">/admin</a>, or add <code>?key=</code> and your ADMIN_KEY.</p>`, { status: 401, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   const checks = [];
   const add = (name, ok, detail) => checks.push({ name, ok, detail });
   const k = env.STRIPE_SECRET_KEY;
@@ -137,7 +144,7 @@ async function setup(env, url) {
   const ready = checks.filter((c) => ["Stripe key", "Stripe account", "Site address"].includes(c.name)).every((c) => c.ok);
   if (url.searchParams.get("format") === "json") return json({ ready, checks });
   const rows = checks.map((c) => `<tr><td>${c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
-  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><style>body{font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#141416}h1{font-size:1.6rem}table{border-collapse:collapse;width:100%}td{padding:.6rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{font-size:1.2rem;width:1.6rem}.r{padding:1rem;background:${ready ? "#e8f5e9" : "#fff3e0"};border:1px solid #ccc;margin:1rem 0}</style><h1>Store setup</h1><div class="r"><b>${ready ? "Ready to take orders." : "Not ready yet \u2014 see below."}</b></div><table>${rows}</table><p style="color:#666">This page is only useful to you. It shows no customer data and no keys. Nobody is told you looked.</p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><style>body{font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#141416}h1{font-size:1.6rem}table{border-collapse:collapse;width:100%}td{padding:.6rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{font-size:1.2rem;width:1.6rem}.r{padding:1rem;background:${ready ? "#e8f5e9" : "#fff3e0"};border:1px solid #ccc;margin:1rem 0}</style><h1>Store setup</h1><div class="r"><b>${ready ? "Ready to take orders." : "Not ready yet \u2014 see below."}</b></div><table>${rows}</table><p style="color:#666">Only whoever runs this store can open this page. It shows no customer data and no keys.</p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 }
 
 /* ---------- Stripe, by plain HTTPS. No SDK to install or update. ---------- */
@@ -181,6 +188,7 @@ async function soldCount(env, p, v) { if (!env.STOCK) return 0; return Number((a
 
 /* ---------- POST /api/checkout ---------- */
 async function checkout(req, env, url, products) {
+  if (Number(req.headers.get("content-length") ?? 0) > 64 * 1024) return bad("That cart is too big to be real.", 413);
   const body = await req.json().catch(() => null);
   if (!body || !Array.isArray(body.items) || !body.items.length) return bad("The cart is empty.");
   if (body.items.length > 50) return bad("That's too many lines for one order. Split it in two.");
@@ -193,6 +201,9 @@ async function checkout(req, env, url, products) {
     if (!p || !v) return bad("Something in the cart isn't on the table any more. Remove it and try again.");
     const qty = Math.max(1, Math.min(10, Number(it.qty) || 1));
     if (!isLive(p, now)) return bad(`${p.title} isn't on sale yet.`);
+    // Hidden means not for sale. The page stays reachable on purpose, but a product id is
+    // easy to find, and an unannounced record must not be buyable before the band says so.
+    if (p.hidden) return bad("Something in the cart isn't on the table any more. Remove it and try again.");
     const sold = await soldCount(env, p.id, v.id);
     if (!variantAvailable(v, sold) || (typeof v.stock === "number" && v.stock - sold < qty)) { soldOut.push({ product: p.id, variant: v.id, title: `${p.title}${p.variants.length > 1 ? ` (${v.title})` : ""}` }); continue; }
     const price = variantPrice(p, v); subtotal += price * qty;
@@ -244,7 +255,15 @@ async function stock(env, url, products) {
 
 /* ---------- POST /api/restock : a fan wants a word if a size comes back ---------- */
 async function restock(req, env, products) {
+  if (Number(req.headers.get("content-length") ?? 0) > 4096) return bad("Too long.", 413);
   const b = await req.json().catch(() => null);
+  if (env.STOCK) {
+    const who = req.headers.get("cf-connecting-ip") ?? "unknown";
+    const k = `rl:restock:${await shortHash(who)}`;
+    const n = Number((await env.STOCK.get(k)) ?? 0) + 1;
+    await env.STOCK.put(k, String(n), { expirationTtl: 3600 });
+    if (n > 10) return bad("That's a lot of requests from one place. Try again later.", 429);
+  }
   const email = String(b?.email ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return bad("That doesn't look like an email address.");
   const p = products.find((x) => x.id === b?.product); if (!p) return bad("No such product.", 404);
@@ -287,8 +306,11 @@ async function webhook(req, env) {
         for (const part of String(s.metadata?.items ?? "").split(",").filter(Boolean)) {
           const [p, v, q] = part.split(":");
           const prod = products.find((x) => x.id === p); const variant = prod?.variants.find((x) => x.id === v);
+          // A bundle takes stock off each of its parts, AND off the bundle itself when the
+          // bundle counts its own stock. A plain product is counted once: pushing [p, v]
+          // again here made every sale count twice, so a run of 500 sold out at 250.
           const targets = prod?.bundle ? prod.bundle.map((b) => [b.product, b.variant === "*" ? v : b.variant]) : [[p, v]];
-          if (typeof variant?.stock === "number") targets.push([p, v]);
+          if (prod?.bundle && typeof variant?.stock === "number") targets.push([p, v]);
           for (const [tp, tv] of targets) { const k = soldKey(tp, tv); await env.STOCK.put(k, String(Number((await env.STOCK.get(k)) ?? 0) + Number(q || 1))); }
         }
         await env.STOCK.put(`order:${s.id}`, "1", { expirationTtl: 60 * 60 * 24 * 30 });
@@ -300,6 +322,12 @@ async function webhook(req, env) {
 
 const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const escapeHtmlLite = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/** A short, one-way hash: a rate-limit bucket should not store anyone's address. */
+async function shortHash(s) {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 function timingSafeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;

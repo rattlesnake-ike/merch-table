@@ -107,11 +107,13 @@ To turn it on, three things:
 
 1. In `store.json`, list who may sign in: `"owners": ["you@yourband.com"]`. Only these addresses, ever.
 2. Add a Worker setting `SESSION_SECRET` with any long random string.
-3. Create the storage the admin writes to, once: `npx wrangler kv namespace create STOCK`, then paste the id it prints into `wrangler.jsonc` under `kv_namespaces` and push.
+3. Create the storage the admin writes to, once: `npx wrangler kv namespace create STOCK`, then paste the id it prints into `wrangler.jsonc` under `kv_namespaces` and push. **Do this even though an id is already there** — that one belongs to the public demo, and your store needs its own.
 
 For the sign-in emails to arrive, add a [Resend](https://resend.com) API key as `RESEND_API_KEY` and set `MAIL_FROM` to an address at your domain. Without it the store still works; the link is written to the Worker's log instead, which you can read in the Cloudflare dashboard.
 
 **What the admin can do:** change a price, rename a product, edit its description, mark any size sold out or back in, set or clear a pre-order ship date, and hide a product from the store. Everything else is still a file edit and a push.
+
+**One more thing worth knowing:** without the KV namespace, a sign-in link can be used more than once inside its fifteen minutes, because there is nowhere to record that it was used. With it, a link works exactly once.
 
 **How it's kept safe:** the sign-in link works once, expires in fifteen minutes, and can never be used as a session by itself. Someone who isn't an owner gets the identical "check your email" response, so the store can't be used to find out who runs it. Saves are refused unless they come from your own store, and every form carries a token tied to your session.
 

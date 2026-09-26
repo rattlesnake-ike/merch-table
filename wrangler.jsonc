@@ -16,6 +16,8 @@
   // store still works: sizes are sold out only when you mark them so in products.json.
   // To turn counting on:  npx wrangler kv namespace create STOCK   then paste the id here.
   // "kv_namespaces": [{ "binding": "STOCK", "id": "paste-the-id-here" }],
+  // Replace this id with your own: npx wrangler kv namespace create STOCK
+  // (the id below belongs to the public demo; a forked store must not share it)
   "kv_namespaces": [{ "binding": "STOCK", "id": "bf5034b2c9744d2fa6088ca60fa8197d" }],
   "vars": {
     // The public address of the store, no trailing slash. Stripe sends fans back here.

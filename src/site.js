@@ -67,14 +67,14 @@
     const ship = () => { const r = (window.__shipping || []).find((x) => x.countries.includes(country.value)); return r || null; };
     const render = () => {
       const cart = load(); empty.hidden = cart.length > 0; full.hidden = cart.length === 0; if (!cart.length) return;
-      rows.innerHTML = cart.map((i, n) => `<tr><td>${i.image ? `<img src="/${i.image}" alt="">` : ""}<a href="/products/${i.product}/">${esc(i.title)}</a>${i.vtitle && i.vtitle !== "One size" ? ` <small>${esc(i.vtitle)}</small>` : ""}${i.ship ? `<br><small>Pre-order, ships ${i.ship}</small>` : ""}<button class="rm" data-rm="${n}" type="button">Remove</button></td><td class="num">${fmt(i.price)}</td><td><input type="number" min="1" max="10" value="${i.qty}" data-qty="${n}" aria-label="Quantity"></td><td class="num">${fmt(i.price * i.qty)}</td></tr>`).join("");
+      rows.innerHTML = cart.map((i, n) => `<tr><td>${i.image ? `<img src="/${esc(i.image)}" alt="">` : ""}<a href="/products/${encodeURIComponent(i.product)}/">${esc(i.title)}</a>${i.vtitle && i.vtitle !== "One size" ? ` <small>${esc(i.vtitle)}</small>` : ""}${i.ship ? `<br><small>Pre-order, ships ${esc(i.ship)}</small>` : ""}<button class="rm" data-rm="${n}" type="button">Remove</button></td><td class="num">${fmt(i.price)}</td><td><input type="number" min="1" max="10" value="${Number(i.qty) || 1}" data-qty="${n}" aria-label="Quantity"></td><td class="num">${fmt(i.price * i.qty)}</td></tr>`).join("");
       const sub = cart.reduce((a, i) => a + i.price * i.qty, 0); const r = ship();
       const shipping = r ? (r.free_over && sub >= r.free_over ? 0 : r.amount) : 0;
       $("[data-subtotal]").textContent = fmt(sub); $("[data-shipping]").textContent = r ? (shipping ? fmt(shipping) : "Free") : "";
       $("[data-total]").textContent = fmt(sub + shipping);
       $("[data-ship-note]").textContent = r ? `${r.estimate || ""}${r.free_over && sub < r.free_over ? ` · free over ${fmt(r.free_over)}` : ""}` : "";
     };
-    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     rows.addEventListener("click", (e) => { const b = e.target.closest("[data-rm]"); if (!b) return; const c = load(); c.splice(+b.dataset.rm, 1); save(c); render(); });
     rows.addEventListener("change", (e) => { const q = e.target.closest("[data-qty]"); if (!q) return; const c = load(); c[+q.dataset.qty].qty = Math.max(1, Math.min(10, +q.value || 1)); save(c); render(); });
     country.addEventListener("change", () => { localStorage.setItem("country", country.value); render(); });
@@ -102,6 +102,6 @@
       $("[data-thanks-line]").textContent = o.paid ? `Your order is in${o.email ? `, and a receipt is on its way to ${o.email}` : ""}.` : "We're waiting for the payment to confirm. This page will not update; your receipt will.";
       if (o.items?.length) { order.hidden = false; order.innerHTML = `<table><tbody>${o.items.map((i) => `<tr><td>${esc(i.description)}</td><td class="num">× ${i.quantity}</td><td class="num">${fmt(i.amount)}</td></tr>`).join("")}${o.shipping != null ? `<tr><td>Shipping</td><td></td><td class="num">${fmt(o.shipping)}</td></tr>` : ""}<tr><td><b>Total</b></td><td></td><td class="num"><b>${fmt(o.total)}</b></td></tr></tbody></table>`; }
     }).catch(() => {});
-    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 })();
