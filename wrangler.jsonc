@@ -19,6 +19,9 @@
   "kv_namespaces": [{ "binding": "STOCK", "id": "bf5034b2c9744d2fa6088ca60fa8197d" }],
   "vars": {
     // The public address of the store, no trailing slash. Stripe sends fans back here.
-    "SITE_URL": "https://merch-table-demo.isaac-holze.workers.dev"
+    "SITE_URL": "https://merch-table-demo.isaac-holze.workers.dev",
+    // Only on the public demo: lets anyone look around the admin without signing in.
+    // Saves are refused. NEVER set this on a real store — it shows your product list to everyone.
+    "DEMO_ADMIN": "1"
   }
 }

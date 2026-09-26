@@ -6,7 +6,7 @@ Your band's own merch store. Static pages on your own domain, a cart, Stripe Che
 
 **What it costs:** Stripe's card fee (2.9% + 30¢ on US cards) and your domain. Hosting is free on Cloudflare's plan for the traffic a band store gets, and the free plan allows commercial use.
 
-**Live demo:** https://merch-table-demo.isaac-holze.workers.dev (a made-up band; checkout is not connected on the demo)
+**Live demo:** https://merch-table-demo.isaac-holze.workers.dev — and the [admin the band uses](https://merch-table-demo.isaac-holze.workers.dev/admin), which you can look around without signing in. (A made-up band. Checkout isn't connected and nothing on the demo can be saved.)
 
 ---
 

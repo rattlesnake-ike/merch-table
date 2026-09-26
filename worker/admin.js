@@ -69,6 +69,13 @@ export async function handleAdmin(req, env, url, store, products, saveProducts, 
   const html = (body, status = 200, headers = {}) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", ...headers } });
 
   if (!sameOrigin(req, env, url)) return new Response("Refused: that request didn't come from this store.", { status: 403, headers: { "content-type": "text/plain" } });
+
+  // DEMO_ADMIN=1 lets anyone look around the admin without signing in. Saves are refused.
+  // Never set this on a real store: it shows your product list to the public.
+  if (env.DEMO_ADMIN === "1") {
+    if (req.method === "POST") return html(`<h1>This is the demo</h1><p>Nothing can be changed here. On your own store this would have saved and gone live at once.</p><p><a href="/admin">Back to the products</a></p>`, 200);
+    return await screens(req, env, url, store, products, { email: "you@yourband.com", gen: 0 }, true);
+  }
   if (!env.SESSION_SECRET) return html(`<h1>Almost there</h1><p>To turn the admin on, add a setting called <code>SESSION_SECRET</code> with any long random string, and list who may sign in under <code>owners</code> in <code>store.json</code>.</p><p><a href="/api/setup">Check the rest of the setup</a></p>`, 503);
   if (!owners(store).length) return html(`<h1>Nobody can sign in yet</h1><p>Add the band's email addresses to <code>owners</code> in <code>store.json</code>, then push. Only those addresses can ever sign in.</p>`, 503);
 
@@ -114,7 +121,14 @@ export async function handleAdmin(req, env, url, store, products, saveProducts, 
       <p class="fine">Only the addresses listed as owners of this store can sign in.</p>`);
   }
 
-  // --- signed in
+  return await screens(req, env, url, store, products, me, false, saveProducts);
+}
+
+async function screens(req, env, url, store, products, me, demo, saveProducts) {
+  const path = url.pathname;
+  const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+  const html = (body, status = 200) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+
   if (path === "/admin" && req.method === "GET") {
     const rows = products.map((p) => {
       const sizes = p.variants.map((v) => `<span class="${v.available === false ? "out" : "in"}">${escapeHtml(v.title)}</span>`).join(" ");
@@ -122,10 +136,11 @@ export async function handleAdmin(req, env, url, store, products, saveProducts, 
         <span class="thumb">${p.images?.[0] ? `<img src="/${escapeHtml(p.images[0])}" alt="" loading="lazy">` : ""}</span>
         <span class="meta"><b>${escapeHtml(p.title)}</b><small>${money(p.price, store)} · ${sizes}</small></span><span class="go">›</span></a>`;
     }).join("");
-    return html(`<header class="bar"><h1>${escapeHtml(store.name)}</h1><a class="ghost" href="/admin/out">Sign out</a></header>
+    return html(`<header class="bar"><h1>${escapeHtml(store.name)}</h1>${demo ? "" : `<a class="ghost" href="/admin/out">Sign out</a>`}</header>
+      ${demo ? `<p class="demo">You're looking at the admin of a made-up band's store. Everything works except saving. <a href="https://github.com/rattlesnake-ike/merch-table">This is the store</a>.</p>` : ""}
       <p class="sub">Tap a product to change its price, mark a size sold out, or hide it. Changes go live straight away.</p>
       <div class="list">${rows}</div>
-      <p class="fine"><a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · signed in as ${escapeHtml(me.email)}</p>`);
+      <p class="fine"><a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
   }
 
   if (path.startsWith("/admin/p/")) {
@@ -245,6 +260,7 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;bo
 .sw input{width:24px;height:24px;flex:none;accent-color:var(--accent);grid-row:1}
 .sw span{grid-column:2}
 .sw small{grid-column:2;color:#666;font-weight:400;font-size:.85rem;line-height:1.35}
+.demo{max-width:34rem;margin:0 auto 14px;padding:12px 14px;background:#fff7e6;border:1px solid #e8c37a;border-radius:8px;font-size:.92rem}
 .sizes .sw{grid-template-columns:24px 1fr auto}
 .sizes .sw small{grid-column:3;grid-row:1;text-align:right}
 form > .sw{margin-top:18px}
