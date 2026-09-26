@@ -36,7 +36,7 @@ export function merchJson(store, products, siteUrl, now = new Date()) {
   return {
     version: 1,
     store: { name: store.name, url: siteUrl, bands: [store.name] },
-    items: products.filter((p) => isLive(p, now.getTime())).map((p) => ({
+    items: products.filter((p) => !p.hidden && isLive(p, now.getTime())).map((p) => ({
       id: p.id,
       title: p.title,
       url: `${siteUrl}/products/${p.id}/`,

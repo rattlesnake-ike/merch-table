@@ -2,6 +2,7 @@
    zero bytes to download. To use your own face, put the .woff2 in ./fonts, add an @font-face here, and set --display / --body. */
 :root{--ink:#141416;--paper:#f3f1ea;--accent:#2743d0;--rule:color-mix(in srgb,var(--ink) 18%,transparent);--soft:color-mix(in srgb,var(--ink) 6%,var(--paper));--display:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;--body:var(--display);--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box}
+img,svg,video{max-width:100%}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
 a{color:var(--accent)}
@@ -16,7 +17,7 @@ p{margin:0 0 1em}
 .fine{font-size:13.5px;color:color-mix(in srgb,var(--ink) 70%,var(--paper))}
 main,.top,.foot{max-width:1180px;margin:0 auto;padding:0 20px}
 .top{display:flex;align-items:center;gap:18px;padding-top:18px;padding-bottom:14px;border-bottom:1.5px solid var(--ink);margin-bottom:26px;flex-wrap:wrap}
-.top nav{margin-left:auto;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.top nav{margin-left:auto;display:flex;gap:18px;align-items:center;flex-wrap:wrap;min-width:0}
 .top nav a{color:var(--ink);text-decoration:none;font-size:15px}
 .top nav a:hover{color:var(--accent)}
 .wm{font-family:var(--display);font-weight:900;text-transform:uppercase;font-size:24px;color:var(--ink);text-decoration:none;letter-spacing:.01em}
@@ -35,8 +36,8 @@ main,.top,.foot{max-width:1180px;margin:0 auto;padding:0 20px}
 .card.sold img{filter:grayscale(1);opacity:.6}
 .card.sold .flag{color:inherit;opacity:.7}
 .product{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:36px;align-items:start}
-@media (max-width:760px){.product{grid-template-columns:1fr;gap:20px}}
-.gallery{display:grid;gap:12px}
+@media (max-width:760px){.product{grid-template-columns:minmax(0,1fr);gap:20px}}
+.gallery{display:grid;gap:12px;min-width:0}
 .gallery img{width:100%;height:auto;display:block;background:#fff;border:1px solid var(--rule)}
 .crumb{font-size:13.5px}.crumb a{color:inherit}
 .buy h1{font-size:clamp(28px,4vw,44px);margin-bottom:10px}

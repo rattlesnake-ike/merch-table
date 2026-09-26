@@ -15,3 +15,4 @@ test("merch.json leaves out unreleased drops and carries every variant", () => {
   assert.equal(m.version, 1); assert.ok(!m.items.some((i) => i.id === "lighthouse-long-sleeve"));
   const tee = m.items.find((i) => i.id === "dog-logo-tee"); assert.equal(tee.variants.length, 5); assert.equal(tee.variants.find((v) => v.id === "l").available, false); assert.equal(tee.price, "25.00");
 });
+test("hidden products stay out of merch.json", () => { const m = merchJson(store, [{ ...products[1], id: "secret", hidden: true }, products[1]], "https://x.test"); assert.equal(m.items.length, 1); });

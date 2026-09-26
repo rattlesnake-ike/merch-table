@@ -177,7 +177,7 @@ export function countryName(code, locale = "en") {
 }
 
 export function rss(store, products) {
-  const items = [...products].filter((p) => isLive(p)).sort((a, b) => new Date(b.published ?? 0) - new Date(a.published ?? 0)).slice(0, 30);
+  const items = [...products].filter((p) => !p.hidden && isLive(p)).sort((a, b) => new Date(b.published ?? 0) - new Date(a.published ?? 0)).slice(0, 30);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>${esc(store.name)}: new on the table</title><link>${esc(store.siteUrl)}</link><description>${esc(store.description ?? "")}</description>
 ${items.map((p) => `<item><title>${esc(p.title)}</title><link>${esc(store.siteUrl)}/products/${esc(p.id)}/</link><guid isPermaLink="true">${esc(store.siteUrl)}/products/${esc(p.id)}/</guid>${p.published ? `<pubDate>${new Date(p.published).toUTCString()}</pubDate>` : ""}<description>${esc(`${money(p.price, store.currency, store.locale)}. ${(p.description ?? "").split("\n")[0]}`)}</description></item>`).join("\n")}
