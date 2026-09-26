@@ -19,6 +19,11 @@ How the code fits together:
 - `scripts/import-shopify.mjs` turns a Shopify CSV export into `products.json`.
 - `npm test` runs the unit tests; `npm run dev` runs the store at http://localhost:8787 with `.dev.vars`.
 
+⚠️ **The demo runs on a real Stripe TEST key.** Checkout opens a real Stripe page and a test
+card completes a real order — nothing can move money, because the key is `sk_test_`. The cart
+carries `store.demo_banner` so nobody mistakes it for a live shop. A band's own copy sets no
+banner and shows none.
+
 ⚠️ **A push does not update the demo.** Isaac reads the live demo at
 https://merch-table-demo.isaac-holze.workers.dev, so a fix that is only committed looks broken
 to him. After any change to `src/`, `worker/` or the JSON, run:

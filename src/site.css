@@ -83,6 +83,7 @@ td.num,th.num{text-align:right;font-family:var(--mono);white-space:nowrap}
 .totals.grand{font-size:20px;border-top:1.5px solid var(--ink);padding-top:8px;margin:8px 0 14px}
 .err{color:#b3261e;font-weight:600}
 /* Not every message in this slot is a failure. */
+.note{color:var(--ink);background:#eef1f6;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;line-height:1.5;font-size:.92rem}
 .err.note{color:var(--ink);font-weight:400;background:#eef1f6;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;line-height:1.5}
 .err:empty{display:none}
 .prose{max-width:68ch}

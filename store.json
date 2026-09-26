@@ -121,5 +121,6 @@
     "btc": "",
     "ada": "",
     "eth": ""
-  }
+  },
+  "demo_banner": "This is a demo store in Stripe TEST mode, so checkout really runs but no money moves. Pay with card 4242 4242 4242 4242, any future date, any CVC."
 }

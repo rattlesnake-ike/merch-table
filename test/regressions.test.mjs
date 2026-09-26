@@ -414,17 +414,19 @@ test("every admin form guards its csrf call for demo mode", () => {
   }
 });
 
-test("the demo says why checkout can't work, instead of showing a key error", () => {
-  // The demo has no Stripe key on purpose — a store anyone can reach must not take money.
-  // But the message was written for a band mid-setup ("put your SECRET key in
-  // STRIPE_SECRET_KEY"), and a visitor evaluating the demo read it as a broken store.
-  const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
-  assert.match(src, /env\.DEMO_ADMIN === "1"[\s\S]{0,400}demo store/, "the demo needs its own wording");
-  assert.match(src, /on purpose/, "say it's deliberate, or it reads as a fault");
-  assert.match(src, /Checkout isn't connected yet: \$\{problem\}/, "a real store still gets the actionable message");
+test("a demo in test mode says so, rather than looking like a real shop", () => {
+  // Isaac: "It should pretend it's working for the demo. I gave you a Stripe key."
+  // Right call — the key is sk_test_, so checkout can run end to end and no money can move.
+  // But a store that takes a card and says nothing would be lying to whoever is trying it.
+  const store = JSON.parse(readFileSync(new URL("../store.json", import.meta.url), "utf8"));
+  assert.match(store.demo_banner ?? "", /TEST mode/, "a demo taking cards must say it is a demo");
+  assert.match(store.demo_banner ?? "", /no money moves/, "say plainly that nothing is charged");
+  assert.match(store.demo_banner ?? "", /4242 4242 4242 4242/, "give them a card that works");
 
-  const site = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
-  assert.match(site, /classList\.toggle\("note"/, "a demo notice must not be styled as an error");
-  const css = readFileSync(new URL("../src/site.css", import.meta.url), "utf8");
-  assert.match(css, /\.err\.note\{/, "the note style has to exist");
+  const tpl = readFileSync(new URL("../src/templates.mjs", import.meta.url), "utf8");
+  assert.match(tpl, /store\.demo_banner \?/, "the banner is opt-in: a real store sets nothing and shows nothing");
+
+  // And a real store with a broken key still gets the specific, actionable message.
+  const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
+  assert.match(src, /Checkout isn't connected yet: \$\{problem\}/);
 });

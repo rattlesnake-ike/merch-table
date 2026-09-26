@@ -130,6 +130,7 @@ export function cartPage(store) {
       <p class="totals"><span>Shipping</span><b data-shipping></b></p>
       <p class="totals grand"><span>Total</span><b data-total></b></p>
       <p class="fine">Discount codes, tax where it applies, and Apple Pay, Google Pay or a card: all on the next page, which is run by Stripe. You'll get a receipt by email.</p>
+      ${store.demo_banner ? `<p class="note">${esc(store.demo_banner)}</p>` : ""}
       <button class="btn" type="submit" data-checkout-btn>Check out</button>
       <p class="err" data-checkout-err role="alert"></p>
     </form>
