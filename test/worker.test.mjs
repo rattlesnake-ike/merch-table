@@ -12,3 +12,17 @@ test("Stripe form encoding nests arrays and objects the way the API expects", ()
   assert.equal(q.get("shipping_address_collection[allowed_countries][1]"), "CA");
   assert.equal(q.get("allow_promotion_codes"), "true");
 });
+
+import { keyProblem } from "../worker/index.js";
+// The samples are assembled at runtime: a literal that looks like a key trips secret scanners.
+const sample = (prefix) => prefix + "_" + "x".repeat(40);
+test("a publishable key is named as the mistake, not reported as 'wrong key'", () => {
+  assert.match(keyProblem(sample("pk_test")), /PUBLISHABLE/);
+  assert.match(keyProblem(sample("whsec")), /webhook signing secret/);
+  assert.match(keyProblem(sample("rk_test")), /restricted/);
+  assert.match(keyProblem(""), /no Stripe key/);
+  assert.match(keyProblem("sk_test_short"), /cut short/);
+  assert.match(keyProblem("hello there"), /doesn't look like/);
+  assert.equal(keyProblem(sample("sk_test")), null);
+  assert.equal(keyProblem(sample("sk_live")), null);
+});

@@ -22,11 +22,15 @@ Click the button. Cloudflare copies this repository into your GitHub account, as
 
 It will ask for:
 
+**Give your project a name nobody has used**, like `yourband-store`. If you see a red *"Cloudflare could not create the Git repository"*, that name is already taken in your GitHub account: change it and click Deploy again.
+
 | Secret | Where to find it |
 |---|---|
-| `STRIPE_SECRET_KEY` | Stripe Dashboard → Developers → API keys → **Secret key**. Use the **test** key (`sk_test_…`) for now. |
+| `STRIPE_SECRET_KEY` | Stripe → **Developers → API keys → Secret key → Reveal**. It starts with **`sk_test_`**. ⚠️ Not the *Publishable* key (`pk_…`), which is the one Stripe shows first and the most common mistake here. |
 | `STRIPE_WEBHOOK_SECRET` | Leave blank for now. Step 6 fills it in. |
 | `ADMIN_KEY` | Any long random string you make up. It protects the back-in-stock list. |
+
+When it finishes, open **`your-store-address/api/setup`**. It tells you in plain words whether the store can actually take an order, and names anything that isn't right.
 
 Prefer the command line? `git clone`, `npm install`, copy `.dev.vars.example` to `.dev.vars` and fill it in, then `npm run deploy`.
 
@@ -57,6 +61,8 @@ npm run dev        # the store at http://localhost:8787, with Stripe in test mod
 ```
 
 Add a shirt to the cart and check out with card number `4242 4242 4242 4242`, any future date, any CVC. You'll land on the thank-you page with the order shown.
+
+If checkout doesn't open, go to `/api/setup`: it says exactly what's wrong rather than making you guess.
 
 ### 4. Make it yours
 

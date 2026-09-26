@@ -17,6 +17,7 @@ export default {
       if (url.pathname === "/api/restock" && req.method === "POST") return await restock(req, env);
       if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
       if (url.pathname === "/api/wants" && req.method === "GET") return await wants(env, url);
+      if (url.pathname === "/api/setup") return await setup(env, url);
       if (url.pathname === "/api/health") return json({ ok: true, products: products.length, stripe: !!env.STRIPE_SECRET_KEY, live: (env.STRIPE_SECRET_KEY || "").startsWith("sk_live_"), stock: !!env.STOCK });
       return bad("Not found", 404);
     } catch (e) {
@@ -26,6 +27,30 @@ export default {
     }
   },
 };
+
+/* ---------- GET /api/setup : is this store actually ready to take money? ---------- */
+async function setup(env, url) {
+  const checks = [];
+  const add = (name, ok, detail) => checks.push({ name, ok, detail });
+  const k = env.STRIPE_SECRET_KEY;
+  const problem = keyProblem(k);
+  add("Stripe key", !problem, problem ? problem : `Looks right (${k.startsWith("sk_live_") ? "LIVE mode: real cards will be charged" : "test mode: use card 4242 4242 4242 4242"}).`);
+  if (!problem) {
+    try {
+      const acct = await stripe(env, "GET", "/account");
+      add("Stripe account", true, `Connected to ${acct.business_profile?.name || acct.email || acct.id}. Charges ${acct.charges_enabled ? "are enabled" : "are NOT enabled yet \u2014 finish activating the account in Stripe"}.`);
+      add("Payouts", !!acct.payouts_enabled, acct.payouts_enabled ? "Stripe can pay you out." : "Add your bank details in Stripe before going live.");
+    } catch (e) { add("Stripe account", false, e.message); }
+  }
+  add("Site address", !!env.SITE_URL, env.SITE_URL ? `Fans return to ${env.SITE_URL} after paying. This must be the address they actually use.` : "SITE_URL is not set, so Stripe may send fans to the wrong place after paying.");
+  add("Stock counting", !!env.STOCK, env.STOCK ? "On: sold-out sizes update themselves as orders come in." : "Off (optional). Sizes are sold out only when you mark them so. To turn it on, create a KV namespace called STOCK.");
+  add("Order webhook", !!env.STRIPE_WEBHOOK_SECRET, env.STRIPE_WEBHOOK_SECRET ? "Set: Stripe tells the store when an order is paid." : "Not set (optional). Only needed for stock counting.");
+  add("Back-in-stock list", !!env.ADMIN_KEY, env.ADMIN_KEY ? "You can download it from /api/wants?key=\u2026" : "ADMIN_KEY is not set, so the list can't be downloaded.");
+  const ready = checks.filter((c) => ["Stripe key", "Stripe account", "Site address"].includes(c.name)).every((c) => c.ok);
+  if (url.searchParams.get("format") === "json") return json({ ready, checks });
+  const rows = checks.map((c) => `<tr><td>${c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
+  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><style>body{font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#141416}h1{font-size:1.6rem}table{border-collapse:collapse;width:100%}td{padding:.6rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{font-size:1.2rem;width:1.6rem}.r{padding:1rem;background:${ready ? "#e8f5e9" : "#fff3e0"};border:1px solid #ccc;margin:1rem 0}</style><h1>Store setup</h1><div class="r"><b>${ready ? "Ready to take orders." : "Not ready yet \u2014 see below."}</b></div><table>${rows}</table><p style="color:#666">This page is only useful to you. It shows no customer data and no keys. Nobody is told you looked.</p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
 
 /* ---------- Stripe, by plain HTTPS. No SDK to install or update. ---------- */
 export function form(obj, prefix = "", out = new URLSearchParams()) {
@@ -38,11 +63,26 @@ export function form(obj, prefix = "", out = new URLSearchParams()) {
   }
   return out;
 }
+export function keyProblem(k) {
+  if (!k) return "the store has no Stripe key yet. Put your Stripe SECRET key (it starts with sk_test_ or sk_live_) in the STRIPE_SECRET_KEY setting.";
+  if (k.startsWith("pk_")) return "the PUBLISHABLE key was pasted instead of the secret one. In Stripe go to Developers \u2192 API keys, click Reveal on the Secret key, and copy the value starting sk_test_ or sk_live_ into STRIPE_SECRET_KEY.";
+  if (k.startsWith("rk_")) return "a restricted key was used. It needs permission to write Checkout Sessions, or use the full secret key (sk_test_ or sk_live_).";
+  if (k.startsWith("whsec_")) return "the webhook signing secret was pasted into STRIPE_SECRET_KEY. The secret key starts with sk_test_ or sk_live_; whsec_ belongs in STRIPE_WEBHOOK_SECRET.";
+  if (!k.startsWith("sk_")) return "that doesn't look like a Stripe secret key. It should start with sk_test_ or sk_live_.";
+  if (k.length < 40) return "the secret key looks cut short, as if the paste was incomplete. Copy the whole value from Stripe.";
+  return null;
+}
+
 async function stripe(env, method, path, body) {
-  if (!env.STRIPE_SECRET_KEY) throw new StripeError("Checkout isn't connected yet: the store has no Stripe key.", 503);
+  const problem = keyProblem(env.STRIPE_SECRET_KEY);
+  if (problem) throw new StripeError(`Checkout isn't connected yet: ${problem}`, 503);
   const res = await fetch(`https://api.stripe.com/v1${path}`, { method, headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded", "stripe-version": "2025-08-27.basil" }, body: body ? form(body) : undefined });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) { console.error("stripe", res.status, JSON.stringify(j.error ?? j)); throw new StripeError(j.error?.type === "invalid_request_error" && /api key/i.test(j.error?.message ?? "") ? "Checkout isn't connected yet: the Stripe key is wrong." : "The payment page couldn't be opened. Try again in a moment.", 502); }
+  if (!res.ok) {
+    console.error("stripe", res.status, JSON.stringify(j.error ?? j));
+    if (res.status === 401) throw new StripeError("Checkout isn't connected yet: Stripe rejected this key. Copy the Secret key again from Stripe \u2192 Developers \u2192 API keys (click Reveal), and make sure you're looking at the same account and the same test/live mode as the store. Check it at /api/setup.", 503);
+    throw new StripeError("The payment page couldn't be opened. Try again in a moment.", 502);
+  }
   return j;
 }
 class StripeError extends Error { constructor(m, status) { super(m); this.status = status; } }
