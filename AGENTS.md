@@ -19,4 +19,13 @@ How the code fits together:
 - `scripts/import-shopify.mjs` turns a Shopify CSV export into `products.json`.
 - `npm test` runs the unit tests; `npm run dev` runs the store at http://localhost:8787 with `.dev.vars`.
 
+⚠️ **A push does not update the demo.** Isaac reads the live demo at
+https://merch-table-demo.isaac-holze.workers.dev, so a fix that is only committed looks broken
+to him. After any change to `src/`, `worker/` or the JSON, run:
+
+    npm run build && npx wrangler deploy --name merch-table-demo
+
+Then check the LIVE url, not `dist/`. This has already caused one "you didn't fix it" — the
+fix was real and the deployed copy was three commits old.
+
 Before saying a change is done: `npm run check`, `npm test`, `npm run build`, then open the affected page at localhost:8787 on a phone-sized viewport and a laptop one.
