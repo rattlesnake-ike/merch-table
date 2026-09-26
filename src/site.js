@@ -45,6 +45,13 @@
       tick();
     }
     // Live stock: grey out what the count says is gone (only where the store counts stock).
+    const markSoldOut = (list) => {
+      if (!list || !list.length) return;
+      for (const v of list) { const lab = $(`[data-variant="${v}"]`, prod); if (!lab || lab.classList.contains("out")) continue; lab.classList.add("out"); const inp = $("input", lab); inp.disabled = true; inp.checked = false; lab.insertAdjacentHTML("beforeend", '<s aria-hidden="true"></s><span class="vis">sold out</span>'); }
+      if (radios.every((r) => r.disabled)) { if (form) form.hidden = true; if (!$(".soldout", prod)) { const so = document.createElement("p"); so.className = "soldout"; so.textContent = "Sold out."; $(".buy", prod).insertBefore(so, restock); } if (restock) restock.hidden = false; }
+      sync();
+    };
+    if (Array.isArray(window.__soldOut)) markSoldOut(window.__soldOut);
     fetch(`/api/stock?product=${encodeURIComponent(prod.dataset.product)}`).then((r) => (r.ok ? r.json() : null)).then((s) => {
       if (!s || !s.soldOut) return;
       for (const v of s.soldOut) { const lab = $(`[data-variant="${v}"]`, prod); if (!lab || lab.classList.contains("out")) continue; lab.classList.add("out"); const inp = $("input", lab); inp.disabled = true; inp.checked = false; lab.insertAdjacentHTML("beforeend", '<s aria-hidden="true"></s><span class="vis">sold out</span>'); }

@@ -2,19 +2,48 @@
 // Routes: POST /api/checkout · GET /api/session · GET /api/stock · POST /api/restock · POST /api/webhook · GET /api/wants
 import store from "../store.json" with { type: "json" };
 import products from "../products.json" with { type: "json" };
-import { isLive, variantAvailable, variantPrice, regionFor, fmtDate } from "../src/lib.mjs";
+import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
+import { handleAdmin } from "./admin.js";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, status);
+
+/** The catalogue the store is actually selling: the band's live edits if any, else the built file. */
+async function liveProducts(env) {
+  if (!env.STOCK) return products;
+  try {
+    const raw = await env.STOCK.get("catalogue");
+    if (!raw) return products;
+    const edited = JSON.parse(raw);
+    return Array.isArray(edited) && edited.length ? edited : products;
+  } catch { return products; }
+}
 
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     try {
-      if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url);
+      if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
+        const live = await liveProducts(env);
+        const save = async (next, who, what) => {
+          const errs = validate(store, next);
+          if (errs.length) return { ok: false, error: errs[0] };
+          if (!env.STOCK) return { ok: false, error: "This store has no storage for live edits yet. Create a KV namespace called STOCK (the README says how), or edit products.json and push." };
+          await env.STOCK.put("catalogue", JSON.stringify(next));
+          const log = JSON.parse((await env.STOCK.get("editlog")) ?? "[]");
+          log.unshift({ at: new Date().toISOString(), who, what });
+          await env.STOCK.put("editlog", JSON.stringify(log.slice(0, 200)));
+          return { ok: true };
+        };
+        return await handleAdmin(req, env, url, store, live, save, null);
+      }
+      // A page the band has edited is patched on the way out, so a save shows at once.
+      if (env.STOCK && (url.pathname === "/" || /^\/products\/[^/]+\/?$/.test(url.pathname))) return await patchPage(req, env, url, await liveProducts(env));
+      if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, await liveProducts(env));
+      if (url.pathname === "/api/catalogue") return json({ products: await liveProducts(env) });
       if (url.pathname === "/api/session" && req.method === "GET") return await session(env, url);
-      if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url);
-      if (url.pathname === "/api/restock" && req.method === "POST") return await restock(req, env);
+      if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url, await liveProducts(env));
+      if (url.pathname === "/api/restock" && req.method === "POST") return await restock(req, env, await liveProducts(env));
       if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
       if (url.pathname === "/api/wants" && req.method === "GET") return await wants(env, url);
       if (url.pathname === "/api/setup") return await setup(env, url);
@@ -27,6 +56,65 @@ export default {
     }
   },
 };
+
+/* ---------- Serve a built page with the band's live edits patched in ---------- */
+async function patchPage(req, env, url, live) {
+  const res = await env.ASSETS.fetch(req);
+  if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) return res;
+  let html = await res.text();
+  const fmt = (c) => new Intl.NumberFormat(store.locale ?? "en-US", { style: "currency", currency: store.currency.toUpperCase(), minimumFractionDigits: c % 100 === 0 ? 0 : 2 }).format(c / 100);
+  const onProduct = url.pathname.match(/^\/products\/([^/]+)\/?$/);
+
+  if (onProduct) {
+    const id = decodeURIComponent(onProduct[1]);
+    const p = live.find((x) => x.id === id); const built = products.find((x) => x.id === id);
+    if (p && built) {
+      if (p.title !== built.title) html = html.split(escapeHtmlLite(built.title)).join(escapeHtmlLite(p.title));
+      if (p.price !== built.price) {
+        html = html.split(`data-price="${built.price}"`).join(`data-price="${p.price}"`);
+        html = html.split(`<span data-price-display>${fmt(built.price)}</span>`).join(`<span data-price-display>${fmt(p.price)}</span>`);
+        for (const v of built.variants) { const bp = v.price ?? built.price, np = (p.variants.find((x) => x.id === v.id) ?? {}).price ?? p.price; if (bp !== np) html = html.split(`data-variant="${v.id}" data-price="${bp}"`).join(`data-variant="${v.id}" data-price="${np}"`); }
+      }
+      if ((p.description ?? "") !== (built.description ?? "") && built.description) {
+        const rebuilt = (p.description ?? "").split(/\n\n+/).map((x) => `<p>${escapeHtmlLite(x).replace(/\n/g, "<br>")}</p>`).join("");
+        const oldBlock = built.description.split(/\n\n+/).map((x) => `<p>${escapeHtmlLite(x).replace(/\n/g, "<br>")}</p>`).join("");
+        html = html.split(oldBlock).join(rebuilt);
+      }
+    }
+  } else {
+    // Front page: rebuild each card's price line from the live data, and drop a hidden card.
+    const cardPrice = (p) => {
+      const lows = p.variants.map((v) => v.price ?? p.price);
+      const lo = Math.min(...lows), hi = Math.max(...lows);
+      return lo === hi ? fmt(lo) : `from ${fmt(lo)}`;
+    };
+    for (const p of live) {
+      const built = products.find((x) => x.id === p.id); if (!built) continue;
+      const before = cardPrice(built), after = cardPrice(p);
+      if (before !== after) {
+        const re = new RegExp(`(href="/products/${escapeRe(p.id)}/"[\\s\\S]{0,400}?<span class="price">)${escapeRe(before)}(</span>)`);
+        html = html.replace(re, (_m, a, b) => a + after + b);
+      }
+      if (p.title !== built.title) html = html.replace(new RegExp(`(href="/products/${escapeRe(p.id)}/"[\\s\\S]{0,300}?<span class="t">)${escapeRe(escapeHtmlLite(built.title))}(</span>)`), (_m, a, b) => a + escapeHtmlLite(p.title) + b);
+      const soldOutNow = !p.variants.some((v) => v.available !== false);
+      if (soldOutNow && built.variants.some((v) => v.available !== false)) {
+        html = html.replace(new RegExp(`<a class="card"( [^>]*)?href="/products/${escapeRe(p.id)}/"`), (_m, a) => `<a class="card sold"${a ?? " "}href="/products/${p.id}/"`);
+        html = html.replace(new RegExp(`(href="/products/${escapeRe(p.id)}/"[\\s\\S]{0,400}?<span class="price">[^<]*</span>)(</span>)`), (_m, a, b) => `${a}<span class="flag">Sold out</span>${b}`);
+      }
+      if (p.hidden && !built.hidden) html = html.replace(new RegExp(`<a class="card[^"]*"[^>]*href="/products/${escapeRe(p.id)}/"[\\s\\S]*?</a>`), "");
+    }
+  }
+
+  // The front-end already asks /api/stock for sold-out sizes; tell it the edited ones too.
+  if (onProduct) {
+    const p = live.find((x) => x.id === decodeURIComponent(onProduct[1]));
+    if (p) {
+      const gone = p.variants.filter((v) => v.available === false).map((v) => v.id);
+      html = html.replace("</head>", `<script>window.__soldOut=${JSON.stringify(gone)};window.__hidden=${p.hidden ? "true" : "false"}</script></head>`);
+    }
+  }
+  return new Response(html, { status: res.status, headers: { ...Object.fromEntries(res.headers), "cache-control": "no-store" } });
+}
 
 /* ---------- GET /api/setup : is this store actually ready to take money? ---------- */
 async function setup(env, url) {
@@ -92,7 +180,7 @@ const soldKey = (p, v) => `sold:${p}:${v}`;
 async function soldCount(env, p, v) { if (!env.STOCK) return 0; return Number((await env.STOCK.get(soldKey(p, v))) ?? 0); }
 
 /* ---------- POST /api/checkout ---------- */
-async function checkout(req, env, url) {
+async function checkout(req, env, url, products) {
   const body = await req.json().catch(() => null);
   if (!body || !Array.isArray(body.items) || !body.items.length) return bad("The cart is empty.");
   if (body.items.length > 50) return bad("That's too many lines for one order. Split it in two.");
@@ -145,7 +233,7 @@ async function session(env, url) {
 }
 
 /* ---------- GET /api/stock?product= : which variants the count says are gone ---------- */
-async function stock(env, url) {
+async function stock(env, url, products) {
   const p = products.find((x) => x.id === url.searchParams.get("product"));
   if (!p) return bad("No such product.", 404);
   if (!env.STOCK) return json({ soldOut: [] }, 200);
@@ -155,7 +243,7 @@ async function stock(env, url) {
 }
 
 /* ---------- POST /api/restock : a fan wants a word if a size comes back ---------- */
-async function restock(req, env) {
+async function restock(req, env, products) {
   const b = await req.json().catch(() => null);
   const email = String(b?.email ?? "").trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return bad("That doesn't look like an email address.");
@@ -189,6 +277,7 @@ async function webhook(req, env) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const mac = [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${raw}`)))].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (!v1s.some((v) => timingSafeEqual(v, mac))) return bad("Bad signature.", 400);
+  const products = await liveProducts(env);
   const ev = JSON.parse(raw);
   if (ev.type === "checkout.session.completed" || ev.type === "checkout.session.async_payment_succeeded") {
     const s = ev.data.object;
@@ -208,6 +297,9 @@ async function webhook(req, env) {
   }
   return json({ received: true });
 }
+
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeHtmlLite = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 function timingSafeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
