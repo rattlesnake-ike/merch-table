@@ -36,6 +36,8 @@ const cookie = (req, name) => (req.headers.get("cookie") ?? "").split(";").map((
 /** Who may sign in: the addresses in store.json's `owners`, nobody else. */
 const owners = (store) => (store.owners ?? []).map((e) => String(e).trim().toLowerCase()).filter(Boolean);
 
+export async function csrfToken(secret, session) { return (await hmac(secret, `csrf:${session.email}:${session.gen ?? 0}`)).slice(0, 24); }
+
 export async function currentAdmin(req, env, store) {
   if (!env.SESSION_SECRET) return null;
   const tok = cookie(req, "mt_session");
@@ -49,11 +51,24 @@ export async function currentAdmin(req, env, store) {
 
 /* ---------------- routes ---------------- */
 
+/** A cross-site POST is refused outright. SameSite=Lax already blocks most of this;
+    this does not depend on the browser getting that right. */
+function sameOrigin(req, env, url) {
+  if (req.method !== "POST") return true;
+  const site = (env.SITE_URL || url.origin).replace(/\/$/, "");
+  const origin = req.headers.get("origin");
+  if (origin) return origin === site || origin === url.origin;
+  const referer = req.headers.get("referer");
+  if (referer) { try { const r = new URL(referer); return r.origin === new URL(site).origin || r.origin === url.origin; } catch { return false; } }
+  return false;   // a form POST from a browser always sends one of the two
+}
+
 export async function handleAdmin(req, env, url, store, products, saveProducts, saveStore) {
   const path = url.pathname;
   const json = (o, status = 200, headers = {}) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...headers } });
   const html = (body, status = 200, headers = {}) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex", ...headers } });
 
+  if (!sameOrigin(req, env, url)) return new Response("Refused: that request didn't come from this store.", { status: 403, headers: { "content-type": "text/plain" } });
   if (!env.SESSION_SECRET) return html(`<h1>Almost there</h1><p>To turn the admin on, add a setting called <code>SESSION_SECRET</code> with any long random string, and list who may sign in under <code>owners</code> in <code>store.json</code>.</p><p><a href="/api/setup">Check the rest of the setup</a></p>`, 503);
   if (!owners(store).length) return html(`<h1>Nobody can sign in yet</h1><p>Add the band's email addresses to <code>owners</code> in <code>store.json</code>, then push. Only those addresses can ever sign in.</p>`, 503);
 
@@ -120,6 +135,7 @@ export async function handleAdmin(req, env, url, store, products, saveProducts, 
 
     if (req.method === "POST") {
       const form = await req.formData();
+      if (!timingSafeEqual(String(form.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<h1>That form had gone stale</h1><p>Open the product again and make the change once more. <a href="/admin/p/${encodeURIComponent(id)}">Back</a></p>`, 403);
       const next = structuredClone(p);
       const cents = parsePrice(form.get("price"));
       if (cents === null) return html(`<h1>That price didn&rsquo;t look right</h1><p>Use a plain number, like <b>25</b> or <b>25.00</b>, and no more than ${money(MAX_PRICE, store)}. <a href="/admin/p/${encodeURIComponent(id)}">Back</a></p>`, 400);
@@ -137,7 +153,7 @@ export async function handleAdmin(req, env, url, store, products, saveProducts, 
 
     const sizes = p.variants.map((v) => `<label class="sw" data-sz><input type="checkbox" name="v_${escapeHtml(v.id)}" ${v.available === false ? "" : "checked"}><span>${escapeHtml(v.title)}</span><small data-state>${v.available === false ? "sold out" : "in stock"}</small></label>`).join("");
     return html(`<header class="bar"><a class="ghost" href="/admin">‹ All products</a></header>
-      <form method="post">
+      <form method="post"><input type="hidden" name="_t" value="${await csrfToken(env.SESSION_SECRET, me)}">
         ${p.images?.[0] ? `<img class="hero" src="/${escapeHtml(p.images[0])}" alt="">` : ""}
         <label for="title">Name</label><input id="title" name="title" value="${escapeHtml(p.title)}" required>
         <label for="price">Price</label><div class="money"><span>${store.currency === "usd" ? "$" : store.currency.toUpperCase()}</span><input id="price" name="price" inputmode="decimal" value="${(p.price / 100).toFixed(2)}" required></div>

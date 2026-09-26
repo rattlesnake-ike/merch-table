@@ -59,3 +59,15 @@ test("ordinary prices read correctly, including pasted currency symbols", () => 
   assert.equal(parsePrice(" 1,250.75 "), 125075);
   assert.equal(parsePrice("0.99"), 99);
 });
+
+import { csrfToken } from "../worker/admin.js";
+test("the CSRF token is tied to the signed-in person and changes when they rotate", async () => {
+  const a = await csrfToken(S, { email: "band@example.com", gen: 0 });
+  const b = await csrfToken(S, { email: "band@example.com", gen: 0 });
+  const other = await csrfToken(S, { email: "someone@example.com", gen: 0 });
+  const rotated = await csrfToken(S, { email: "band@example.com", gen: 1 });
+  assert.equal(a, b);                  // stable for the same session
+  assert.notEqual(a, other);           // not transferable between people
+  assert.notEqual(a, rotated);         // dies when the session generation moves
+  assert.notEqual(a, await csrfToken("another-secret-entirely", { email: "band@example.com", gen: 0 }));
+});
