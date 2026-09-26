@@ -1,6 +1,6 @@
 /* One stylesheet. Colours come from store.json (written into :root at build time). System fonts by default:
    zero bytes to download. To use your own face, put the .woff2 in ./fonts, add an @font-face here, and set --display / --body. */
-:root{--ink:#141416;--paper:#f3f1ea;--accent:#2743d0;--rule:color-mix(in srgb,var(--ink) 18%,transparent);--soft:color-mix(in srgb,var(--ink) 6%,var(--paper));--display:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;--body:var(--display);--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+:root{--ink:#141416;--paper:#f3f1ea;--accent:#2743d0;--radius:0px;--rule:color-mix(in srgb,var(--ink) 18%,transparent);--soft:color-mix(in srgb,var(--ink) 6%,var(--paper));--display:ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;--body:var(--display);--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box}
 img,svg,video{max-width:100%}
 html{-webkit-text-size-adjust:100%}
@@ -55,7 +55,7 @@ main,.top,.foot{max-width:1180px;margin:0 auto;padding:0 20px}
 .vis{position:absolute;left:-999px}
 .qty{display:flex;gap:10px;align-items:center;margin:0 0 14px}
 .qty input{width:64px;padding:8px;border:1.5px solid var(--ink);background:var(--paper);font:inherit;font-family:var(--mono)}
-.btn{display:inline-block;font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:16px;letter-spacing:.03em;padding:12px 20px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:2px;line-height:1;text-decoration:none;cursor:pointer}
+.btn{display:inline-block;font-family:var(--display);font-weight:800;text-transform:uppercase;font-size:16px;letter-spacing:.03em;padding:12px 20px;border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:var(--radius);line-height:1;text-decoration:none;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn:disabled{opacity:.45;cursor:default}
 .added{margin-top:10px;font-weight:600}

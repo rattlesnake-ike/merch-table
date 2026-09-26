@@ -66,7 +66,19 @@ If checkout doesn't open, go to `/api/setup`: it says exactly what's wrong rathe
 
 ### 4. Make it yours
 
-`store.json` → `colors` sets the ink, paper and accent colours. `src/site.css` is the whole stylesheet, 150 lines. System fonts by default (zero bytes to download); to use your own, drop a `.woff2` in `public/fonts/`, add an `@font-face`, and set `--display` and `--body` at the top of the stylesheet.
+Three lines in `store.json` change the whole look. No CSS needed:
+
+```json
+"colors": { "ink": "#2b1a12", "paper": "#fbf6ee", "accent": "#a63d2f" },
+"look":   { "corners": "round", "headings": "normal", "font": "serif" }
+```
+
+- **`colors`** — `ink` is the text, `paper` is the background, `accent` is links and prices. Pull them straight out of your album art.
+- **`corners`** — `square`, `soft` or `round`.
+- **`headings`** — `uppercase` or `normal`.
+- **`font`** — `system`, `grotesk`, `serif`, `slab`, `mono` or `rounded`. All load instantly because they're already on the device. For your own face, put the `.woff2` and a `fonts.css` with the `@font-face` in `public/fonts/`, then set `"font": "Your Face Name"`.
+
+Your logo goes in `brand/favicon.svg`. Beyond that, `src/site.css` is the whole stylesheet, about 150 lines, and yours to edit.
 
 If you use a coding agent (Claude Code, Codex, Cursor), open it in this folder and ask for what you want: "make the front page look like our album art in `brand/`", "add a second image to every product", "add a page for tour dates". Everything is plain HTML, CSS and JavaScript.
 

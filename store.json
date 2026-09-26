@@ -104,5 +104,10 @@
   ],
   "owners": [
     "band@example.com"
-  ]
+  ],
+  "look": {
+    "corners": "square",
+    "headings": "uppercase",
+    "font": "system"
+  }
 }

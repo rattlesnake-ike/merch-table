@@ -63,7 +63,24 @@ write("_redirects", redirects.join("\n") + "\n");
 write("_headers", `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self' https:; frame-ancestors 'none'; base-uri 'self'\n/images/*\n  Cache-Control: public, max-age=31536000, immutable\n`);
 
 // Styles and script, with the store's colours and shipping table written in.
-const css = readFileSync(join(root, "src/site.css"), "utf8").replace(":root{", `:root{--ink:${store.colors?.ink ?? "#141416"};--paper:${store.colors?.paper ?? "#f3f1ea"};--accent:${store.colors?.accent ?? "#2743d0"};`);
+// The look: colours, corners, heading case, and a font, all from store.json.
+const look = store.look ?? {};
+const FONTS = {
+  system: `ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif`,
+  grotesk: `"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif`,
+  serif: `ui-serif,Georgia,"Times New Roman",serif`,
+  slab: `"Rockwell","Courier Bold",Georgia,serif`,
+  mono: `ui-monospace,SFMono-Regular,Menlo,Consolas,monospace`,
+  rounded: `ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",system-ui,sans-serif`,
+};
+const face = FONTS[look.font] ?? (look.font ? `${look.font},${FONTS.system}` : FONTS.system);
+const radius = look.corners === "round" ? "10px" : look.corners === "soft" ? "4px" : "0px";
+const headingCase = look.headings === "normal" ? "none" : look.headings === "small-caps" ? "lowercase" : "uppercase";
+// Appended, not prepended: in CSS the last declaration wins, so the band's values must come after the defaults.
+let css = readFileSync(join(root, "src/site.css"), "utf8");
+css += `\n/* the band's look, from store.json */\n:root{--ink:${store.colors?.ink ?? "#141416"};--paper:${store.colors?.paper ?? "#f3f1ea"};--accent:${store.colors?.accent ?? "#2743d0"};--radius:${radius};--display:${face};--body:${face}}\n`;
+css += `h1,h2,h3{text-transform:${headingCase}}\n.card,.btn,input,select,textarea,.restock,.sz{border-radius:var(--radius)}\n`;
+if (look.font && !FONTS[look.font] && existsSync(join(root, "public/fonts"))) css = `/* self-hosted face declared in public/fonts/fonts.css */\n@import "/fonts/fonts.css";\n` + css;
 write("site.css", css);
 const js = `window.__store=${JSON.stringify({ currency: store.currency.toUpperCase(), locale: store.locale ?? "en-US" })};window.__shipping=${JSON.stringify(store.shipping.map(({ id, name, countries, amount, free_over, estimate }) => ({ id, name, countries, amount, free_over, estimate })))};\n` + readFileSync(join(root, "src/site.js"), "utf8");
 write("site.js", js);
