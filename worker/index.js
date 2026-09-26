@@ -4,7 +4,8 @@ import store from "../store.json" with { type: "json" };
 import products from "../products.json" with { type: "json" };
 import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
 import { handleAdmin, currentAdmin } from "./admin.js";
-import { recordOrder, ordersForEmail, orderRows } from "./orders.js";
+import { recordOrder, ordersForEmail, orderRows, getOrder, listOrders } from "./orders.js";
+import { isTicket, ticketProducts, ticketsForOrder, ticketHtml, usedAt, showOver, ticketsLeft } from "./tickets.js";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, status);
@@ -42,6 +43,7 @@ export default {
       if (env.STOCK && (url.pathname === "/" || /^\/products\/[^/]+\/?$/.test(url.pathname))) return await patchPage(req, env, url, await liveProducts(env));
       if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, await liveProducts(env));
       if (url.pathname === "/orders" || url.pathname === "/orders/") return await lookup(req, env, url);
+      if (url.pathname.startsWith("/tickets")) return await ticketsPage(req, env, url);
       if (url.pathname === "/api/catalogue") return json({ products: (await liveProducts(env)).filter((p) => !p.hidden && isLive(p)) });
       if (url.pathname === "/api/session" && req.method === "GET") return await session(env, url);
       if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url, await liveProducts(env));
@@ -138,6 +140,40 @@ async function lookup(req, env, url) {
   return page(`<h1>Your order${orders.length > 1 ? "s" : ""}</h1><div class="tbl"><table><thead><tr><th>What</th><th class="num">Paid</th><th>Where it is</th></tr></thead><tbody>${orderRows(orders, store, { forBand: false })}</tbody></table></div>${help}`);
 }
 
+/* ---------- /tickets : the fan's tickets, kept on their phone ---------- */
+async function ticketsPage(req, env, url) {
+  const live = await liveProducts(env);
+  const css = `<style>
+  body{font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;margin:0;background:#141416;color:#fff;padding:18px}
+  main{max-width:30rem;margin:0 auto}
+  h1{font-size:1.4rem;margin:.2rem 0 1rem}
+  .tkt{background:#fff;color:#141416;border-radius:14px;padding:20px;margin:0 0 16px;text-align:center}
+  .tkt .who{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin:0;color:#666}
+  .tkt h2{font-size:1.3rem;margin:.3rem 0}
+  .tkt .where,.tkt .when{margin:.2rem 0;font-size:.95rem}
+  .tkt .when{font-weight:600}
+  .tkt .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:2.4rem;letter-spacing:.12em;margin:.6rem 0 .2rem;font-weight:700}
+  .tkt .holder{margin:0;color:#666;font-size:.9rem}
+  .tkt.used{opacity:.55}
+  .tkt .stamp{margin:.5rem 0 0;color:#b3261e;font-weight:700;text-transform:uppercase;font-size:.8rem;letter-spacing:.06em}
+  form input,form button{font:inherit;padding:12px;border-radius:8px;border:1.5px solid #555;background:#1e1e22;color:#fff;width:100%;margin:6px 0}
+  form button{background:#fff;color:#141416;font-weight:700;border-color:#fff;cursor:pointer}
+  .fine{color:#aaa;font-size:.88rem}
+  a{color:#9ab6ff}
+  </style>`;
+  const page = (body, status = 200) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Tickets · ${escapeHtmlLite(store.name)}</title>${css}</head><body><main>${body}</main></body></html>`, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+
+  if (req.method !== "POST") return page(`<h1>Your tickets</h1><p class="fine">Type the email you bought them with. Save this page to your phone before you leave for the show, so you have it if there's no signal at the door.</p><form method="post"><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" aria-label="Your email"><button type="submit">Show my tickets</button></form>`);
+
+  if (Number(req.headers.get("content-length") ?? 0) > 2048) return page(`<h1>Try again</h1>`, 413);
+  const form = await req.formData();
+  const orders = await ordersForEmail(env, form.get("email"));
+  const out = [];
+  for (const o of orders) for (const t of await ticketsForOrder(env, o, live)) out.push({ t, o, used: await usedAt(env, o.id, t.seq) });
+  if (!out.length) return page(`<h1>No tickets under that address</h1><p class="fine">They may have been bought with a different email. Write to <a href="mailto:${escapeHtmlLite(store.email ?? "")}">${escapeHtmlLite(store.email ?? "the band")}</a> and a person will sort it out.</p>`);
+  return page(`<h1>Your ticket${out.length > 1 ? "s" : ""}</h1>${out.map(({ t, o, used }) => ticketHtml(t, o, store, used)).join("")}<p class="fine">Show the code at the door. Each one works once.</p>`);
+}
+
 /* ---------- GET /api/setup : is this store actually ready to take money? ---------- */
 async function setup(req, env, url, store) {
   // The setup page names the band's Stripe account and says whether real money is switched
@@ -225,6 +261,7 @@ async function checkout(req, env, url, products) {
     // Hidden means not for sale. The page stays reachable on purpose, but a product id is
     // easy to find, and an unannounced record must not be buyable before the band says so.
     if (p.hidden) return bad("Something in the cart isn't on the table any more. Remove it and try again.");
+    if (isTicket(p) && showOver(p, now)) return bad(`${p.show.title ?? p.title} has already happened.`);
     const sold = await soldCount(env, p.id, v.id);
     if (!variantAvailable(v, sold) || (typeof v.stock === "number" && v.stock - sold < qty)) { soldOut.push({ product: p.id, variant: v.id, title: `${p.title}${p.variants.length > 1 ? ` (${v.title})` : ""}` }); continue; }
     const price = variantPrice(p, v); subtotal += price * qty;

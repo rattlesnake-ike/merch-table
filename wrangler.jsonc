@@ -9,7 +9,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/orders", "/orders/*", "/", "/products/*"]
+    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/orders", "/orders/*", "/tickets", "/tickets/*", "/", "/products/*"]
   },
   "observability": { "enabled": true },
   // Stock counting and back-in-stock requests need a KV namespace. Without one the

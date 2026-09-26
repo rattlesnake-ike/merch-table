@@ -2,7 +2,7 @@
 
 Your band's own merch store. Static pages on your own domain, a cart, Stripe Checkout, hosted free on Cloudflare. No platform between you and your fans, no monthly rent, no tracking scripts. Leaving is copying a folder.
 
-**What it does:** product pages with sizes and variants, sold-out sizes struck through, a cart, Apple Pay / Google Pay / Link / cards at checkout, discount codes, shipping by region with free-over thresholds, receipts, pre-orders (a ship date on the page, in the cart and on the receipt), bundles, drops that go on sale at a set time by themselves, back-in-stock requests, live stock counting, old Shopify URLs redirected, a sitemap, an RSS feed, `merch.json` for fan tools, and schema.org data for search engines. Two JSON files hold the whole catalogue.
+**What it does:** tickets for your own shows with a door check-in, product pages with sizes and variants, sold-out sizes struck through, a cart, Apple Pay / Google Pay / Link / cards at checkout, discount codes, shipping by region with free-over thresholds, receipts, pre-orders (a ship date on the page, in the cart and on the receipt), bundles, drops that go on sale at a set time by themselves, back-in-stock requests, live stock counting, old Shopify URLs redirected, a sitemap, an RSS feed, `merch.json` for fan tools, and schema.org data for search engines. Two JSON files hold the whole catalogue.
 
 **What it costs:** Stripe's card fee (2.9% + 30¢ on US cards) and your domain. Hosting is free on Cloudflare's plan for the traffic a band store gets, and the free plan allows commercial use.
 
@@ -117,6 +117,33 @@ For the sign-in emails to arrive, add a [Resend](https://resend.com) API key as 
 
 **How it's kept safe:** the sign-in link works once, expires in fifteen minutes, and can never be used as a session by itself. Someone who isn't an owner gets the identical "check your email" response, so the store can't be used to find out who runs it. Saves are refused unless they come from your own store, and every form carries a token tied to your session.
 
+## Tickets: sell your own shows
+
+A ticket is a product with a `show` block. Add one to `products.json` and the store sells tickets — no ticketing company, no service fee, no per-ticket cut. The fan pays the price on the page.
+
+```json
+{
+  "id": "release-show-brooklyn",
+  "title": "Harbor Lights release show — Brooklyn",
+  "price": 1800,
+  "variants": [{ "id": "advance", "title": "Advance", "available": true, "stock": 120 }],
+  "show": {
+    "title": "Harbor Lights release show",
+    "venue": "The Broadway", "city": "Brooklyn, NY",
+    "date": "2026-11-13", "time": "20:00", "doors": "8pm",
+    "capacity": 120
+  }
+}
+```
+
+**The fan** goes to `/tickets`, types the email they bought with, and gets their tickets with a big code on each. Tell them to save the page before they leave home, so it works if the venue has no signal.
+
+**The door** is `/admin/door` on a phone. Someone types the code and gets a green *Let them in* or a red *Already used*, with the buyer's name. Each code works exactly once, is tied to one seat in one order, and can't be invented without your store's `SESSION_SECRET`. Typing it in lowercase or without the dash works fine, because that's how people type at a door.
+
+**What it costs you:** Stripe's 2.9% + 30¢. Nothing else. On a $18 ticket that's about 82¢. Ticketmaster's service fees run about 21% of the ticket, and even the 2026 settlement caps them at 15% of face value. Other independent platforms charge a few percent or a monthly fee on top of card processing.
+
+**Where this doesn't reach:** a venue with an exclusive ticketing contract. That's a contract, not a technical limit, and no software gets around it. For your own shows, house shows, record releases, and independent rooms, this is the whole system.
+
 ## Orders, and not losing an argument with a bank
 
 Every paid order lands at **`/admin/orders`**: who ordered, what, where it goes, and a box for the tracking number. Put the tracking in when you post it. That one habit is the difference between winning and losing if a buyer ever tells their bank the parcel never came.
@@ -163,6 +190,7 @@ src/site.js       cart, size picker, drops, stock, checkout hand-off
 worker/index.js   the server: /api/checkout, /api/session, /api/stock, /api/restock, /api/webhook, /api/wants, /api/setup
 worker/admin.js   the band's admin: sign-in links, the product editor, the order list
 worker/orders.js  orders, tracking, the buyer's lookup, the dispute pack
+worker/tickets.js ticket codes, the fan's tickets, the door
 scripts/          import-shopify.mjs, check.mjs
 ```
 

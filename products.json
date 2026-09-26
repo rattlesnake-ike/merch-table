@@ -170,7 +170,7 @@
     "title": "Fall tour poster",
     "price": 2000,
     "kind": "prints",
-    "description": "18 × 24 inches, two-colour screen print on French Paper, signed and numbered edition of 150.",
+    "description": "18 \u00d7 24 inches, two-colour screen print on French Paper, signed and numbered edition of 150.",
     "images": [
       "images/fall-tour-poster.svg"
     ],
@@ -262,5 +262,33 @@
     ],
     "live_at": "2026-11-13T20:00:00-05:00",
     "published": "2026-09-25T12:00:00Z"
+  },
+  {
+    "id": "release-show-brooklyn",
+    "title": "Harbor Lights release show \u2014 Brooklyn",
+    "price": 1800,
+    "kind": "other",
+    "description": "Our record release show. Doors at 8, we play at 9:30.\n\nTickets are sold by us, not a ticketing company: the price you see is the price you pay.",
+    "images": [
+      "images/fall-tour-poster.svg"
+    ],
+    "variants": [
+      {
+        "id": "advance",
+        "title": "Advance",
+        "available": true,
+        "stock": 120
+      }
+    ],
+    "show": {
+      "title": "Harbor Lights release show",
+      "venue": "The Broadway",
+      "city": "Brooklyn, NY",
+      "date": "2026-11-13",
+      "time": "20:00",
+      "doors": "8pm",
+      "capacity": 120
+    },
+    "published": "2026-09-26T12:00:00Z"
   }
 ]

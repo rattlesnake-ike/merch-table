@@ -73,3 +73,42 @@ test("the store records what a bank asks for, at the time of sale", () => {
   assert.match(worker, /buyerKey = ip \? await shortHash/, "the buyer key must be a hash, never a stored IP");
   assert.doesNotMatch(worker, /metadata: \{[^}]*\bip:/, "a raw IP must never go into Stripe metadata");
 });
+
+import { ticketCode, verifyCode, isTicket, showOver, ticketsLeft } from "../worker/tickets.js";
+const SEC = "a-long-test-secret-for-tickets";
+
+test("a ticket code cannot be invented without the store's secret", async () => {
+  const good = await ticketCode(SEC, "cs_1", "show:a:0");
+  assert.equal(await verifyCode(SEC, "cs_1", "show:a:0", good), true);
+  assert.equal(await verifyCode("another-secret", "cs_1", "show:a:0", good), false);
+  assert.equal(await verifyCode(SEC, "cs_2", "show:a:0", good), false, "a code is bound to its order");
+  assert.equal(await verifyCode(SEC, "cs_1", "show:a:1", good), false, "and to its seat");
+  for (const junk of ["", "ZZZZ-9999", "A", null, undefined, good + "X"]) assert.equal(await verifyCode(SEC, "cs_1", "show:a:0", junk), false);
+});
+
+test("a code is read the way a person types it", async () => {
+  const c = await ticketCode(SEC, "cs_1", "show:a:0");
+  for (const form of [c.toLowerCase(), c.replace("-", ""), c.replace("-", " "), ` ${c} `]) assert.equal(await verifyCode(SEC, "cs_1", "show:a:0", form), true);
+});
+
+test("every seat in one order gets its own code", async () => {
+  const codes = new Set();
+  for (let i = 0; i < 25; i++) codes.add(await ticketCode(SEC, "cs_1", `show:a:${i}`));
+  assert.equal(codes.size, 25);
+});
+
+test("a show that has happened cannot be sold", () => {
+  const past = { show: { date: "2020-01-01" } }, future = { show: { date: "2099-01-01" } };
+  assert.equal(showOver(past), true);
+  assert.equal(showOver(future), false);
+  assert.equal(showOver({}), false, "a normal product is not a show");
+  assert.equal(isTicket(past), true);
+  assert.equal(isTicket({ id: "tee" }), false);
+  assert.match(worker, /isTicket\(p\) && showOver\(p, now\)/, "checkout must refuse a past show");
+});
+
+test("capacity counts down", () => {
+  assert.equal(ticketsLeft({ show: { capacity: 120 } }, 40), 80);
+  assert.equal(ticketsLeft({ show: { capacity: 120 } }, 200), 0, "never negative");
+  assert.equal(ticketsLeft({ show: {} }, 5), null, "no capacity set means no limit");
+});

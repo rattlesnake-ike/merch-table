@@ -1,4 +1,5 @@
 import { listOrders, getOrder, markShipped, orderRows, trackingUrl } from "./orders.js";
+import { isTicket, ticketProducts, ticketsForOrder, verifyCode, admit, usedAt, showOver } from "./tickets.js";
 /* The band's own admin: sign in by emailed link, edit products on a phone, save, done.
    No GitHub, no files, no terminal. Live edits go to KV and the Worker serves them
    over the built pages; the repo stays the backup, not the bottleneck. */
@@ -131,6 +132,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
   const html = (body, status = 200) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 
   if (path === "/admin/orders" || path.startsWith("/admin/orders/")) return await ordersScreen(req, env, url, store, me, demo);
+  if (path === "/admin/door" || path.startsWith("/admin/door/")) return await doorScreen(req, env, url, store, products, me, demo);
 
   if (path === "/admin" && req.method === "GET") {
     const rows = products.map((p) => {
@@ -143,7 +145,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
       ${demo ? `<p class="demo">You're looking at the admin of a made-up band's store. Everything works except saving. <a href="https://github.com/rattlesnake-ike/merch-table">This is the store</a>.</p>` : ""}
       <p class="sub">Tap a product to change its price, mark a size sold out, or hide it. Changes go live straight away.</p>
       <div class="list">${rows}</div>
-      <p class="fine"><a href="/admin/orders">Orders</a> · <a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
+      <p class="fine"><a href="/admin/orders">Orders</a> · <a href="/admin/door">Door</a> · <a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
   }
 
   if (path.startsWith("/admin/p/")) {
@@ -196,6 +198,60 @@ export function parsePrice(raw) {
   const cents = Math.round(Number(s) * 100);
   if (!Number.isFinite(cents) || cents <= 0 || cents > MAX_PRICE) return null;
   return cents;
+}
+
+/** The door. Someone types a code, and gets a green yes or a red no. Nothing else.
+    Built for one hand, bad light, and a queue of people waiting. */
+async function doorScreen(req, env, url, store, products, me, demo) {
+  const shows = ticketProducts(products).filter((p) => !showOver(p));
+  const css = `<style>
+    body{background:#141416;color:#fff;font:16px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;margin:0;padding:18px}
+    main{max-width:28rem;margin:0 auto}
+    h1{font-size:1.3rem;margin:.2rem 0 .6rem}
+    .sub,.fine{color:#aaa}
+    input,button,select{font:inherit;width:100%;padding:16px;border-radius:10px;border:1.5px solid #555;background:#1e1e22;color:#fff;margin:8px 0}
+    input[name=code]{font-family:ui-monospace,Menlo,monospace;font-size:2rem;text-align:center;letter-spacing:.1em;text-transform:uppercase}
+    button{background:#fff;color:#141416;font-weight:800;border-color:#fff;cursor:pointer;font-size:1.1rem}
+    .yes,.no,.warn{border-radius:12px;padding:22px;text-align:center;margin:12px 0}
+    .yes{background:#1b5e20;border:2px solid #4caf50}
+    .no{background:#5f1a17;border:2px solid #e57373}
+    .warn{background:#5d4a12;border:2px solid #e6c34a}
+    .big{font-size:2rem;font-weight:800;margin:0 0 .3rem}
+    a{color:#9ab6ff}
+    .count{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;color:#aaa;font-size:.9rem}
+  </style>`;
+  const page = (body, status = 200) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Door</title>${css}</head><body><main>${body}</main></body></html>`, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+
+  const form = async (msg = "") => `<h1>Door</h1>
+    ${shows.length ? `<p class="sub">${shows.map((p) => escapeHtml(p.show.title ?? p.title)).join(" · ")}</p>` : `<p class="sub">No upcoming shows in the store.</p>`}
+    ${msg}
+    <form method="post"><input type="hidden" name="_t" value="${demo ? "" : await csrfToken(env.SESSION_SECRET, me)}">
+      <input name="code" required autofocus autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-1234" aria-label="Ticket code" inputmode="latin">
+      <button type="submit">Check in</button></form>
+    <p class="fine"><a href="/admin">Products</a> · <a href="/admin/orders">Orders</a></p>`;
+
+  if (req.method !== "POST") return page(await form());
+
+  const f = await req.formData();
+  if (!demo && !timingSafeEqual(String(f.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return page(await form(`<div class="warn"><p class="big">Reload the page</p><p>It had been open too long.</p></div>`), 403);
+  const code = String(f.get("code") ?? "");
+  if (demo) return page(await form(`<div class="warn"><p class="big">Demo</p><p>A real door would check that code against the tickets sold.</p></div>`));
+
+  // Find the one ticket this code belongs to.
+  const orders = await listOrders(env, 1000);
+  for (const o of orders) {
+    for (const t of await ticketsForOrder(env, o, products)) {
+      if (!(await verifyCode(env.SESSION_SECRET ?? "unset", o.id, t.seq, code))) continue;
+      const show = t.product.show;
+      const who = escapeHtml(o.name ?? o.email ?? "");
+      const what = escapeHtml(show.title ?? t.product.title);
+      const r = await admit(env, o.id, t.seq);
+      if (r.already) return page(await form(`<div class="no"><p class="big">Already used</p><p>${what} · ${who}</p><p class="fine">Checked in at ${new Date(r.at).toLocaleTimeString(store.locale ?? "en-US")}. If that wasn't them, ask for ID or send them to whoever runs the show.</p></div>`));
+      if (!r.ok) return page(await form(`<div class="warn"><p class="big">Can't check in</p><p>${escapeHtml(r.reason ?? "")}</p></div>`));
+      return page(await form(`<div class="yes"><p class="big">Let them in</p><p>${what} · ${who}</p></div>`));
+    }
+  }
+  return page(await form(`<div class="no"><p class="big">Not a ticket</p><p class="fine">No ticket with that code. Check for a typo, or look them up by email in <a href="/admin/orders">Orders</a>.</p></div>`));
 }
 
 /** The band's order list, and the one box that protects them: tracking. */

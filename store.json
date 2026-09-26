@@ -82,6 +82,10 @@
   },
   "sections": [
     {
+      "kind": "other",
+      "title": "Shows"
+    },
+    {
       "kind": "music",
       "title": "Records and tapes"
     },
