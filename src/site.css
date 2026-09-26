@@ -62,6 +62,9 @@ main,.top,.foot{max-width:1180px;margin:0 auto;padding:0 20px}
 .soldout{font-weight:700;font-size:18px}
 .restock{margin:14px 0;padding:14px;background:var(--soft);border:1px solid var(--rule)}
 .restock div,.list div,.field{display:flex;gap:8px;flex-wrap:wrap}
+/* `display` on a class beats the browser's default for [hidden], so anything hidden in JS
+   keeps showing. One rule, everywhere, rather than remembering it at each call site. */
+[hidden]{display:none !important}
 input[type=email],select{padding:10px 12px;border:1.5px solid var(--ink);background:var(--paper);font:inherit;min-width:220px}
 .desc{margin-top:22px;max-width:60ch}
 table{border-collapse:collapse;width:100%;font-size:15px}

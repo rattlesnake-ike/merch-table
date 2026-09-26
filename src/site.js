@@ -47,7 +47,7 @@
       e.preventDefault(); const r = chosen(); if (!r) return;
       const lab = r.closest("[data-variant]"); const qty = Math.max(1, Math.min(10, +$("#qty", prod).value || 1));
       const cart = load(); const ex = cart.find((i) => i.product === prod.dataset.product && i.variant === r.value);
-      if (ex) ex.qty = Math.min(10, ex.qty + qty); else cart.push({ product: prod.dataset.product, variant: r.value, qty, title: prod.dataset.title, vtitle: $("span", lab).textContent, price: +lab.dataset.price, image: prod.dataset.image, ship: prod.dataset.shipDate || "" });
+      if (ex) ex.qty = Math.min(10, ex.qty + qty); else cart.push({ product: prod.dataset.product, variant: r.value, qty, title: prod.dataset.title, vtitle: $("span", lab).textContent, price: +lab.dataset.price, image: prod.dataset.image, ship: prod.dataset.shipDate || "", ticket: prod.dataset.ticket === "1" });
       save(cart); const a = $("[data-added]", prod); if (a) a.hidden = false;
     });
     // Drops: when the time comes, show the form without a reload.
@@ -91,9 +91,14 @@
     const render = () => {
       const cart = load(); empty.hidden = cart.length > 0; full.hidden = cart.length === 0; if (!cart.length) return;
       rows.innerHTML = cart.map((i, n) => `<tr><td>${i.image ? `<img src="/${esc(i.image)}" alt="">` : ""}<a href="/products/${encodeURIComponent(i.product)}/">${esc(i.title)}</a>${i.vtitle && i.vtitle !== "One size" ? ` <small>${esc(i.vtitle)}</small>` : ""}${i.ship ? `<br><small>Pre-order, ships ${esc(i.ship)}</small>` : ""}<button class="rm" data-rm="${n}" type="button">Remove</button></td><td class="num">${fmt(i.price)}</td><td><input type="number" min="1" max="10" value="${Number(i.qty) || 1}" data-qty="${n}" aria-label="Quantity"></td><td class="num">${fmt(i.price * i.qty)}</td></tr>`).join("");
-      const sub = cart.reduce((a, i) => a + i.price * i.qty, 0); const r = ship();
+      const sub = cart.reduce((a, i) => a + i.price * i.qty, 0);
+      // Tickets are collected at a door. A cart of only tickets must not ask where to post them.
+      const allTickets = cart.every((i) => i.ticket);
+      const shipField = document.querySelector("[data-ship-field]");
+      if (shipField) shipField.hidden = allTickets;
+      const r = allTickets ? null : ship();
       const shipping = r ? (r.free_over && sub >= r.free_over ? 0 : r.amount) : 0;
-      $("[data-subtotal]").textContent = fmt(sub); $("[data-shipping]").textContent = r ? (shipping ? fmt(shipping) : "Free") : "";
+      $("[data-subtotal]").textContent = fmt(sub); $("[data-shipping]").textContent = allTickets ? "Nothing to post" : r ? (shipping ? fmt(shipping) : "Free") : "";
       $("[data-total]").textContent = fmt(sub + shipping);
       $("[data-ship-note]").textContent = r ? `${r.estimate || ""}${r.free_over && sub < r.free_over ? ` · free over ${fmt(r.free_over)}` : ""}` : "";
     };

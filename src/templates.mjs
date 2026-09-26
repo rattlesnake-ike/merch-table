@@ -88,7 +88,7 @@ export function productPage(store, p, products) {
   const gallery = (p.images ?? []).map((src, i) => `<img src="/${esc(src)}" alt="${esc(p.title)}${i ? `, view ${i + 1}` : ""}" width="800" height="800" ${i ? 'loading="lazy"' : 'fetchpriority="high"'}>`).join("");
   const desc = (p.description ?? "").split(/\n\n+/).map((para) => `<p>${esc(para).replace(/\n/g, "<br>")}</p>`).join("");
   const body = `
-<article class="product" data-product="${esc(p.id)}" data-sold-out-text="${esc(store.sold_out_text ?? "Sold out.")}" data-title="${esc(p.title)}" data-price="${p.price}" data-image="${esc(p.images?.[0] ?? "")}" ${p.live_at ? `data-live-at="${esc(p.live_at)}"` : ""} ${p.ship_date ? `data-ship-date="${esc(p.ship_date)}"` : ""}>
+<article class="product" data-product="${esc(p.id)}" data-sold-out-text="${esc(store.sold_out_text ?? "Sold out.")}" data-title="${esc(p.title)}" data-price="${p.price}" data-image="${esc(p.images?.[0] ?? "")}" ${p.live_at ? `data-live-at="${esc(p.live_at)}"` : ""} ${p.ship_date ? `data-ship-date="${esc(p.ship_date)}"` : ""} ${p.show?.date ? 'data-ticket="1"' : ""}>
   <div class="gallery">${gallery}</div>
   <div class="buy">
     <p class="crumb"><a href="/">${esc(store.name)}</a> / ${esc(p.title)}</p>
@@ -125,7 +125,7 @@ export function cartPage(store) {
   <div data-cart-full hidden>
     <table class="cart"><thead><tr><th>Item</th><th>Each</th><th>Qty</th><th class="num">Total</th></tr></thead><tbody data-cart-rows></tbody></table>
     <form class="checkout" data-checkout>
-      <div class="field"><label for="country">Ships to</label><select id="country" name="country" required>${regions}</select><p class="fine" data-ship-note></p></div>
+      <div class="field" data-ship-field><label for="country">Ships to</label><select id="country" name="country" required>${regions}</select><p class="fine" data-ship-note></p></div>
       <p class="totals"><span>Items</span><b data-subtotal></b></p>
       <p class="totals"><span>Shipping</span><b data-shipping></b></p>
       <p class="totals grand"><span>Total</span><b data-total></b></p>

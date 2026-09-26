@@ -360,6 +360,13 @@ async function checkout(req, env, url, products) {
   }
   if (soldOut.length) return bad(`Sold out while it sat in the cart: ${soldOut.map((s) => s.title).join(", ")}. It's been taken out; the rest is still there.`, 409, { soldOut });
   const free = region.free_over && subtotal >= region.free_over;
+  // A ticket is collected at a door, not posted. A cart of nothing but tickets must not ask
+  // for a shipping address or quote "3 to 7 business days" — that reads as a mistake to a fan
+  // and makes the band look like they do not know what they are selling.
+  const allTickets = body.items.every((it) => {
+    const p = products.find((x) => x.id === it.product);
+    return p && isTicket(p);
+  });
   const site = (env.SITE_URL || url.origin).replace(/\/$/, "");
 
   // A short, stable key for the buyer's network, so repeat customers can be recognised without
@@ -384,8 +391,10 @@ async function checkout(req, env, url, products) {
     cancel_url: `${site}/cart/`,
     allow_promotion_codes: true,
     billing_address_collection: "auto",
-    shipping_address_collection: { allowed_countries: region.countries },
-    shipping_options: [{ shipping_rate_data: { type: "fixed_amount", display_name: free ? `${region.name}: free shipping` : region.name, fixed_amount: { amount: free ? 0 : region.amount, currency: store.currency }, ...(region.estimate ? { metadata: { estimate: region.estimate } } : {}) } }],
+    ...(allTickets ? {} : {
+      shipping_address_collection: { allowed_countries: region.countries },
+      shipping_options: [{ shipping_rate_data: { type: "fixed_amount", display_name: free ? `${region.name}: free shipping` : region.name, fixed_amount: { amount: free ? 0 : region.amount, currency: store.currency }, ...(region.estimate ? { metadata: { estimate: region.estimate } } : {}) } }],
+    }),
     ...(store.phone_at_checkout ? { phone_number_collection: { enabled: true } } : {}),
     ...(store.tax?.automatic ? { automatic_tax: { enabled: true } } : {}),
     // What a bank wants to see if this is ever disputed. Written now because none of it can be

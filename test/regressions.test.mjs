@@ -343,3 +343,23 @@ test("the QR code is real: it decodes back to the same URI", async () => {
   assert.ok(modules > 200, `only ${modules} modules drawn — the encoder produced nothing usable`);
   assert.ok(svg.includes('fill="#fff"'), "a QR needs a white quiet zone or phones cannot read it");
 });
+
+test("a ticket is not posted: a ticket-only cart asks for no shipping address", () => {
+  const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
+  assert.match(src, /const allTickets = body\.items\.every/, "checkout must know when a cart is all tickets");
+  assert.match(src, /\.\.\.\(allTickets \? \{\} : \{/, "shipping_address_collection must be conditional");
+
+  const site = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
+  assert.match(site, /const allTickets = cart\.every\(\(i\) => i\.ticket\)/, "the cart must know too");
+  assert.match(site, /Nothing to post/, "the cart should say so rather than leave the row blank");
+
+  const tpl = readFileSync(new URL("../src/templates.mjs", import.meta.url), "utf8");
+  assert.match(tpl, /data-ticket="1"/, "a ticket product must be marked in the page");
+  assert.match(tpl, /data-ship-field/, "the shipping field must be targetable so it can be hidden");
+});
+
+test("a cart with a shirt in it still collects a shipping address", () => {
+  // The guard is `every`, not `some` — one physical item and the whole order ships.
+  const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
+  assert.ok(!/body\.items\.some\(.*isTicket/.test(src), "must be every(), or a shirt would ship nowhere");
+});
