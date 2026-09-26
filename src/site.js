@@ -123,7 +123,10 @@
         const res = await fetch("/api/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items: load().map((i) => ({ product: i.product, variant: i.variant, qty: i.qty })), country: country.value }) });
         const j = await res.json().catch(() => ({}));
         if (res.ok && j.url) { location.href = j.url; return; }
+        // A demo saying "there's no Stripe account behind this" is information, not a fault.
+        // Red bold error text makes a working demo look broken to the person evaluating it.
         err.textContent = j.error || "Checkout didn't open. Try again in a moment.";
+        err.classList.toggle("note", /demo store/.test(err.textContent));
         if (j.soldOut) { const c = load().filter((i) => !j.soldOut.some((s) => s.product === i.product && s.variant === i.variant)); save(c); render(); }
       } catch { err.textContent = "Checkout didn't open. Check your connection and try again."; }
       btn.disabled = false; btn.textContent = "Check out";

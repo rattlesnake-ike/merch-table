@@ -312,7 +312,18 @@ export function keyProblem(k) {
 
 export async function stripe(env, method, path, body) {
   const problem = keyProblem(env.STRIPE_SECRET_KEY);
-  if (problem) throw new StripeError(`Checkout isn't connected yet: ${problem}`, 503);
+  if (problem) {
+    // The public demo has no Stripe key ON PURPOSE — a store anyone can reach must not be able
+    // to take money. But a visitor clicking Check out sees this, not a band mid-setup, so say
+    // what's actually happening instead of instructions they can't act on.
+    if (env.DEMO_ADMIN === "1") {
+      throw new StripeError(
+        "This is the demo store, so it can't take payment \u2014 there's no Stripe account behind it, on purpose. Everything up to this point is real: the cart, the prices, the shipping, the tickets. On your own copy you paste one key and this button works.",
+        503,
+      );
+    }
+    throw new StripeError(`Checkout isn't connected yet: ${problem}`, 503);
+  }
   const res = await fetch(`https://api.stripe.com/v1${path}`, { method, headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded", "stripe-version": "2025-08-27.basil" }, body: body ? form(body) : undefined });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) {

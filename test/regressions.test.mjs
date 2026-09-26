@@ -413,3 +413,18 @@ test("every admin form guards its csrf call for demo mode", () => {
     assert.match(line, /demo/, `unguarded csrf call would 500 a demo:\n  ${line.trim().slice(0, 100)}`);
   }
 });
+
+test("the demo says why checkout can't work, instead of showing a key error", () => {
+  // The demo has no Stripe key on purpose — a store anyone can reach must not take money.
+  // But the message was written for a band mid-setup ("put your SECRET key in
+  // STRIPE_SECRET_KEY"), and a visitor evaluating the demo read it as a broken store.
+  const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
+  assert.match(src, /env\.DEMO_ADMIN === "1"[\s\S]{0,400}demo store/, "the demo needs its own wording");
+  assert.match(src, /on purpose/, "say it's deliberate, or it reads as a fault");
+  assert.match(src, /Checkout isn't connected yet: \$\{problem\}/, "a real store still gets the actionable message");
+
+  const site = readFileSync(new URL("../src/site.js", import.meta.url), "utf8");
+  assert.match(site, /classList\.toggle\("note"/, "a demo notice must not be styled as an error");
+  const css = readFileSync(new URL("../src/site.css", import.meta.url), "utf8");
+  assert.match(css, /\.err\.note\{/, "the note style has to exist");
+});
