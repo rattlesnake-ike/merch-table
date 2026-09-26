@@ -1,0 +1,19 @@
+{
+  "name": "merch-table",
+  "version": "1.0.0",
+  "description": "A band's own merch store: static pages on your own domain, a cart, Stripe Checkout, free hosting. No platform, no rent, no tracking.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node src/build.mjs",
+    "check": "node scripts/check.mjs",
+    "dev": "node src/build.mjs && wrangler dev",
+    "deploy": "node src/build.mjs && wrangler deploy",
+    "import": "node scripts/import-shopify.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.41.0"
+  },
+  "engines": { "node": ">=20" }
+}

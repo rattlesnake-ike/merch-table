@@ -1,0 +1,29 @@
+{
+  "name": "Northern Dogs",
+  "tagline": "Records, shirts and the odd thing, straight from the van.",
+  "description": "The official merch table of Northern Dogs. Everything here ships from our own closet in Queens.",
+  "currency": "usd",
+  "locale": "en-US",
+  "email": "hello@example.com",
+  "homepage": "https://example.com",
+  "links": [
+    { "label": "Bandcamp", "url": "https://northerndogs.bandcamp.com" },
+    { "label": "Shows", "url": "https://example.com/shows" }
+  ],
+  "colors": { "ink": "#141416", "paper": "#f3f1ea", "accent": "#2743d0" },
+  "shipping": [
+    { "id": "us", "name": "United States", "countries": ["US"], "amount": 600, "free_over": 7500, "estimate": "3 to 7 business days" },
+    { "id": "ca", "name": "Canada", "countries": ["CA"], "amount": 1400, "estimate": "1 to 3 weeks" },
+    { "id": "row", "name": "Everywhere else", "countries": ["GB", "IE", "FR", "DE", "NL", "BE", "ES", "IT", "PT", "SE", "NO", "DK", "FI", "AT", "CH", "PL", "CZ", "AU", "NZ", "JP", "MX", "BR"], "amount": 2400, "estimate": "2 to 4 weeks" }
+  ],
+  "tax": { "automatic": false },
+  "phone_at_checkout": false,
+  "mailing_list": { "action": "", "label": "Get an email when there's something new. Nothing else." },
+  "sections": [
+    { "kind": "music", "title": "Records and tapes" },
+    { "kind": "apparel", "title": "Shirts and hoodies" },
+    { "kind": "accessories", "title": "Small things" },
+    { "kind": "unusual", "title": "The odd thing" },
+    { "kind": "prints", "title": "Posters" }
+  ]
+}

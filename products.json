@@ -1,0 +1,128 @@
+[
+  {
+    "id": "harbor-lights-lp",
+    "title": "Harbor Lights LP (sea-glass green)",
+    "price": 2800,
+    "kind": "music",
+    "description": "Our second record on 140g sea-glass green vinyl. Limited to 500. Gatefold sleeve, printed inner, download code.\n\nShips the week of the release. Order now and it goes out first.",
+    "images": ["images/harbor-lights-lp.svg"],
+    "variants": [{ "id": "green", "title": "Sea-glass green", "available": true, "stock": 500 }],
+    "ship_date": "2026-11-13",
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "id": "harbor-lights-cassette",
+    "title": "Harbor Lights cassette",
+    "price": 1200,
+    "kind": "music",
+    "description": "Clear shell, blue ink, J-card with the lyrics. Dubbed in real time.",
+    "images": ["images/harbor-lights-cassette.svg"],
+    "variants": [{ "id": "one", "title": "Cassette", "available": true }],
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "id": "dog-logo-tee",
+    "title": "Dog logo tee",
+    "price": 2500,
+    "kind": "apparel",
+    "description": "Heavyweight cotton, printed by hand in Ridgewood. Runs true to size.",
+    "images": ["images/dog-logo-tee.svg", "images/dog-logo-tee-back.svg"],
+    "variants": [
+      { "id": "s", "title": "S", "available": true },
+      { "id": "m", "title": "M", "available": true },
+      { "id": "l", "title": "L", "available": false },
+      { "id": "xl", "title": "XL", "available": true },
+      { "id": "2xl", "title": "2XL", "available": true, "price": 2800 }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "id": "van-hoodie",
+    "title": "Van hoodie",
+    "price": 5500,
+    "kind": "apparel",
+    "description": "The van, embroidered, on a heavy fleece pullover. Warm enough for load-out in February.",
+    "images": ["images/van-hoodie.svg"],
+    "variants": [
+      { "id": "s", "title": "S", "available": true },
+      { "id": "m", "title": "M", "available": true },
+      { "id": "l", "title": "L", "available": true },
+      { "id": "xl", "title": "XL", "available": true }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "id": "harbor-cap",
+    "title": "Harbor cap",
+    "price": 3000,
+    "kind": "apparel",
+    "description": "Unstructured six-panel, brass buckle, the lighthouse stitched small on the front.",
+    "images": ["images/harbor-cap.svg"],
+    "variants": [{ "id": "one", "title": "One size", "available": true }],
+    "published": "2026-08-15T12:00:00Z"
+  },
+  {
+    "id": "enamel-pin-set",
+    "title": "Enamel pin set",
+    "price": 1400,
+    "kind": "accessories",
+    "description": "Three pins: the dog, the van, the lighthouse. Rubber clutches.",
+    "images": ["images/enamel-pin-set.svg"],
+    "variants": [{ "id": "one", "title": "Set of three", "available": true }],
+    "published": "2026-08-15T12:00:00Z"
+  },
+  {
+    "id": "canvas-tote",
+    "title": "Canvas tote",
+    "price": 1800,
+    "kind": "unusual",
+    "description": "Natural canvas, one colour print. Holds twelve records or a week of groceries.",
+    "images": ["images/canvas-tote.svg"],
+    "variants": [{ "id": "one", "title": "Tote", "available": true }],
+    "published": "2026-08-15T12:00:00Z"
+  },
+  {
+    "id": "fall-tour-poster",
+    "title": "Fall tour poster",
+    "price": 2000,
+    "kind": "prints",
+    "description": "18 × 24 inches, two-colour screen print on French Paper, signed and numbered edition of 150.",
+    "images": ["images/fall-tour-poster.svg"],
+    "variants": [{ "id": "one", "title": "Poster", "available": true, "stock": 150 }],
+    "published": "2026-09-10T12:00:00Z"
+  },
+  {
+    "id": "harbor-lights-bundle",
+    "title": "Harbor Lights bundle: LP + tee",
+    "price": 4800,
+    "compare_at": 5300,
+    "kind": "music",
+    "description": "The sea-glass green LP and the dog logo tee together, five dollars off. Ships together when the record does.",
+    "images": ["images/harbor-lights-bundle.svg"],
+    "bundle": [{ "product": "harbor-lights-lp", "variant": "green" }, { "product": "dog-logo-tee", "variant": "*" }],
+    "variants": [
+      { "id": "s", "title": "Tee S", "available": true },
+      { "id": "m", "title": "Tee M", "available": true },
+      { "id": "l", "title": "Tee L", "available": false },
+      { "id": "xl", "title": "Tee XL", "available": true }
+    ],
+    "ship_date": "2026-11-13",
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "id": "lighthouse-long-sleeve",
+    "title": "Lighthouse long sleeve",
+    "price": 3800,
+    "kind": "apparel",
+    "description": "Cream long sleeve, lighthouse down the arm. Goes on sale at the release show.",
+    "images": ["images/lighthouse-long-sleeve.svg"],
+    "variants": [
+      { "id": "s", "title": "S", "available": true },
+      { "id": "m", "title": "M", "available": true },
+      { "id": "l", "title": "L", "available": true },
+      { "id": "xl", "title": "XL", "available": true }
+    ],
+    "live_at": "2026-11-13T20:00:00-05:00",
+    "published": "2026-09-25T12:00:00Z"
+  }
+]

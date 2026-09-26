@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.dev.vars
+.env
+.wrangler/
+.cache/
+exports/*.csv
+.DS_Store

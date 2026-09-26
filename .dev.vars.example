@@ -1,0 +1,11 @@
+# Secrets. Copy this file to .dev.vars for local work; on Cloudflare they are Worker secrets.
+# Never commit .dev.vars. Never put these in wrangler.jsonc.
+
+# Stripe > Developers > API keys. Use the TEST key (sk_test_...) until your first real order.
+STRIPE_SECRET_KEY=sk_test_replace_me
+
+# Stripe > Developers > Webhooks > your endpoint > Signing secret (whsec_...). Optional; needed for stock counting.
+STRIPE_WEBHOOK_SECRET=
+
+# Any long random string. Lets you download back-in-stock requests at /api/wants?key=...
+ADMIN_KEY=
