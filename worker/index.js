@@ -198,6 +198,8 @@ async function setup(req, env, url, store) {
       add("Payouts", !!acct.payouts_enabled, acct.payouts_enabled ? "Stripe can pay you out." : "Add your bank details in Stripe before going live.");
     } catch (e) { add("Stripe account", false, e.message); }
   }
+  // Not a failure: a thing worth knowing about, where the band is already looking.
+  checks.push({ name: "Stablecoin payments", ok: null, detail: "Optional. Turning this on in your Stripe Dashboard costs 1.5% against 2.9% + 30\u00a2 on cards, settles as dollars, and refunds to the buyer's wallet by itself. No change here. Expect very few people to use it \u2014 under 2% of US consumers pay with crypto at all." });
   add("Site address", !!env.SITE_URL, env.SITE_URL ? `Fans return to ${env.SITE_URL} after paying. This must be the address they actually use.` : "SITE_URL is not set, so Stripe may send fans to the wrong place after paying.");
   add("Stock counting", !!env.STOCK, env.STOCK ? "On: sold-out sizes update themselves as orders come in." : "Off (optional). Sizes are sold out only when you mark them so. To turn it on, create a KV namespace called STOCK.");
   add("Order webhook", !!env.STRIPE_WEBHOOK_SECRET, env.STRIPE_WEBHOOK_SECRET ? "Set: Stripe tells the store when an order is paid." : "Not set (optional). Only needed for stock counting.");
@@ -218,7 +220,9 @@ async function setup(req, env, url, store) {
   }
   const ready = checks.filter((c) => ["Stripe key", "Stripe account", "Site address"].includes(c.name)).every((c) => c.ok);
   if (url.searchParams.get("format") === "json") return json({ ready, checks });
-  const rows = checks.map((c) => `<tr><td>${c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
+  // ok === null means "worth knowing", not "wrong": a red cross against an optional thing
+  // reads as a fault the band has to fix, which is a lie.
+  const rows = checks.map((c) => `<tr><td>${c.ok === null ? "\u00b7" : c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
   return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><style>body{font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#141416}h1{font-size:1.6rem}table{border-collapse:collapse;width:100%}td{padding:.6rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{font-size:1.2rem;width:1.6rem}.r{padding:1rem;background:${ready ? "#e8f5e9" : "#fff3e0"};border:1px solid #ccc;margin:1rem 0}</style><h1>Store setup</h1><div class="r"><b>${ready ? "Ready to take orders." : "Not ready yet \u2014 see below."}</b></div><table>${rows}</table><p style="color:#666">Only whoever runs this store can open this page. It shows no customer data and no keys.</p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 }
 

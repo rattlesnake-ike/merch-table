@@ -146,6 +146,42 @@ A ticket is a product with a `show` block. Add one to `products.json` and the st
 
 **Where this doesn't reach:** a venue with an exclusive ticketing contract. That's a contract, not a technical limit, and no software gets around it. For your own shows, house shows, record releases, and independent rooms, this is the whole system.
 
+## Taking crypto, if you want to
+
+Short version: **turn on stablecoin payments in your Stripe Dashboard.** One toggle, no code
+here changes, and it is *cheaper than the cards you already take* — 1.5% against 2.9% + 30¢.
+It settles as dollars in the same Stripe balance, so there is no wallet to guard, no seed
+phrase, no price swing, and nothing new at tax time. Refunds go back to the buyer's wallet by
+themselves, which matters because this store refunds every ticket holder when a show is called
+off. US businesses, $10,000 a transaction, and it is USDC rather than Bitcoin.
+
+**Expect almost nobody to use it.** The Kansas City Fed, reading the Federal Reserve's own
+household survey, puts US consumers paying with crypto at *under 2%, and falling*. Overstock
+pushed it hard and got 0.2% of sales. Bandcamp — the platform closest to what you do — has
+never accepted it at all. Nobody has ever published crypto merch numbers that look good. Turn
+it on because you want to, not because you are expecting revenue.
+
+**If the whole point is self-custody** — coins into your own wallet, no company in the middle —
+that is a different project and this store does not do it yet. Honestly, before you build it:
+
+- **Refunding a cancelled show on-chain is the worst day of the project.** There is no
+  reply-to address in a Bitcoin transaction, and the address that paid you is often an
+  exchange's shared wallet, so money sent back there can be gone for good. Every refund
+  becomes a link the fan has to return to and claim, you pay the fees, and the exchange rate
+  has moved. Test that before you sell a single ticket.
+- **A member who has seen the seed phrase can empty the wallet, forever, from anywhere.** No
+  reset, no reversal. The only fix after someone leaves is a new wallet from a seed they have
+  never seen. Plan that rotation now rather than during the breakup.
+- **Never ship on an unconfirmed transaction.** Bitcoin Core made replace-by-fee unconditional
+  in v29; a payment you can see is not a payment you have.
+- **Put only a dedicated account's public key on the server.** It cannot spend, but it does
+  reveal every sale and your running balance to anyone who reads it.
+- **There is no small-amount exemption at tax time.** Every sale is income at that day's value
+  and every conversion is a separate disposal. Converting the same day collapses it to nearly
+  nothing, which is the simplest thing you can do.
+- A band splitting revenue is probably a partnership by default, which is a bigger question
+  than any of this and one for an accountant.
+
 ## Orders, and not losing an argument with a bank
 
 Every paid order lands at **`/admin/orders`**: who ordered, what, where it goes, and a box for the tracking number. Put the tracking in when you post it. That one habit is the difference between winning and losing if a buyer ever tells their bank the parcel never came.
