@@ -26,10 +26,27 @@ export async function verifyCode(secret, orderId, seq, code) {
 export const isTicket = (p) => !!p?.show?.date;
 export const ticketProducts = (products) => products.filter(isTicket);
 
-/** How many are left, counting what has sold. */
+/**
+ * The band's ALLOCATION: how many of this room's tickets the venue agreed the band may sell.
+ *
+ * This is deliberately not "the room's capacity". A venue's box office has to close one equation
+ * on the night — unsold + comps + sold = the room — and a ticket sold outside that count is a
+ * body with no row in it. Four businesses once sold tickets to one Fort Worth show with no
+ * shared count: 2,000 people turned up to a room that held 1,670 and the fire marshal closed it.
+ * So the band sells a slice the venue has already subtracted from its own manifest, the way an
+ * artist presale allocation has always worked. `capacity` still reads as an allocation for
+ * stores written before this existed.
+ */
+export const allocationOf = (p) => {
+  const a = p?.show?.allocation ?? p?.show?.capacity;
+  return typeof a === "number" ? a : null;
+};
+
+/** How many of the band's allocation are left, counting what has sold. */
 export function ticketsLeft(p, sold) {
-  if (typeof p.show?.capacity !== "number") return null;
-  return Math.max(0, p.show.capacity - (sold ?? 0));
+  const a = allocationOf(p);
+  if (a === null) return null;
+  return Math.max(0, a - (sold ?? 0));
 }
 
 /** Doors close: a show in the past cannot be sold. */
@@ -106,7 +123,7 @@ export async function headcount(env, products) {
       for (const k of r.keys) if (k.name.includes(`:${p.id}:`)) inRoom++;
       cursor = r.cursor; done = r.list_complete || !r.cursor;
     }
-    out.push({ id: p.id, title: p.show?.title ?? p.title, capacity: p.show?.capacity ?? null, inRoom });
+    out.push({ id: p.id, title: p.show?.title ?? p.title, allocation: allocationOf(p), room: p.show?.room_capacity ?? null, inRoom });
   }
   return out;
 }

@@ -194,7 +194,7 @@ test("a ticket code is found however it is typed", async () => {
   }
 });
 
-import { headcount } from "../worker/tickets.js";
+import { headcount, allocationOf } from "../worker/tickets.js";
 
 test("the door can say how many are in the room", async () => {
   const keys = [];
@@ -203,7 +203,7 @@ test("the door can say how many are in the room", async () => {
     get: async () => null, put: async () => {},
   } };
   const products = [
-    { id: "fri", title: "Friday", variants: [{ id: "one" }], show: { date: "2099-01-01", title: "Friday", capacity: 200 } },
+    { id: "fri", title: "Friday", variants: [{ id: "one" }], show: { date: "2099-01-01", title: "Friday", allocation: 200, room_capacity: 450 } },
     { id: "sat", title: "Saturday", variants: [{ id: "one" }], show: { date: "2099-01-02", title: "Saturday", capacity: 120 } },
   ];
   for (let i = 0; i < 37; i++) keys.push({ name: `ticket:o${i}:fri:one:0` });
@@ -214,11 +214,35 @@ test("the door can say how many are in the room", async () => {
   const sat = c.find((x) => x.id === "sat");
   assert.equal(fri.inRoom, 37, "Friday's count must not include Saturday's check-ins");
   assert.equal(sat.inRoom, 5);
-  assert.equal(fri.capacity, 200);
+  assert.equal(fri.allocation, 200, "the band's slice of the room, not the room");
+  assert.equal(fri.room, 450, "the room's own capacity, for the venue's count");
+  assert.equal(sat.allocation, 120, "a store written before allocations still reads");
 });
 
 test("a show that has happened is not counted at the door", async () => {
   const env = { STOCK: { list: async () => ({ keys: [], list_complete: true }), get: async () => null, put: async () => {} } };
   const past = [{ id: "old", title: "Last year", variants: [{ id: "one" }], show: { date: "2020-01-01", title: "Last year" } }];
   assert.equal((await headcount(env, past)).length, 0);
+});
+
+
+test("the band sells its allocation, never the whole room", () => {
+  const show = { id: "s", show: { date: "2099-01-01", allocation: 40, room_capacity: 300 } };
+  assert.equal(allocationOf(show), 40, "the band's slice");
+  assert.equal(ticketsLeft(show, 0), 40);
+  assert.equal(ticketsLeft(show, 39), 1);
+  assert.equal(ticketsLeft(show, 40), 0, "sold out at the allocation, not at the room");
+  assert.equal(ticketsLeft(show, 999), 0, "never negative");
+});
+
+test("a show written before allocations existed still works", () => {
+  const old = { id: "s", show: { date: "2099-01-01", capacity: 120 } };
+  assert.equal(allocationOf(old), 120, "capacity is read as an allocation");
+  assert.equal(ticketsLeft(old, 100), 20);
+});
+
+test("a show with no number sells without a limit, and says so by returning null", () => {
+  const open = { id: "s", show: { date: "2099-01-01" } };
+  assert.equal(allocationOf(open), null);
+  assert.equal(ticketsLeft(open, 5), null);
 });

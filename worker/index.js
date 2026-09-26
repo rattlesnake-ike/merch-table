@@ -198,6 +198,20 @@ async function setup(req, env, url, store) {
   add("Stock counting", !!env.STOCK, env.STOCK ? "On: sold-out sizes update themselves as orders come in." : "Off (optional). Sizes are sold out only when you mark them so. To turn it on, create a KV namespace called STOCK.");
   add("Order webhook", !!env.STRIPE_WEBHOOK_SECRET, env.STRIPE_WEBHOOK_SECRET ? "Set: Stripe tells the store when an order is paid." : "Not set (optional). Only needed for stock counting.");
   add("Back-in-stock list", !!env.ADMIN_KEY, env.ADMIN_KEY ? "You can download it from /api/wants?key=\u2026" : "ADMIN_KEY is not set, so the list can't be downloaded.");
+  // Shows: the check that is about a room, not about this software. A venue's box office has to
+  // close unsold + comps + sold = the room. A ticket sold outside that count is a body with no
+  // row in it, so a band selling its own must be selling a slice the venue already subtracted.
+  const shows = products.filter((p) => p.show?.date);
+  if (shows.length) {
+    const noAlloc = shows.filter((p) => typeof (p.show.allocation ?? p.show.capacity) !== "number");
+    const noRoom = shows.filter((p) => typeof p.show.room_capacity !== "number");
+    add("Ticket allocation", !noAlloc.length, noAlloc.length
+      ? `${noAlloc.map((p) => p.show.title ?? p.title).join(", ")} has no allocation, so the store will sell without a limit. Set show.allocation to the number the venue agreed you may sell.`
+      : `Selling ${shows.map((p) => `${p.show.allocation ?? p.show.capacity} for ${p.show.title ?? p.title}`).join("; ")}. That is your slice, not the room.`);
+    add("Agreed with the venue", !noRoom.length, noRoom.length
+      ? `Ask the venue three things and write them here as show.room_capacity and show.venue_contact: what the room holds, how many of those you may sell, and how your names reach their door list. Selling outside their count is how a show gets shut down.`
+      : `Room holds ${shows.map((p) => p.show.room_capacity).join("/")}. Send your sold list to the venue before doors; the door count is theirs to defend, not yours.`);
+  }
   const ready = checks.filter((c) => ["Stripe key", "Stripe account", "Site address"].includes(c.name)).every((c) => c.ok);
   if (url.searchParams.get("format") === "json") return json({ ready, checks });
   const rows = checks.map((c) => `<tr><td>${c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
