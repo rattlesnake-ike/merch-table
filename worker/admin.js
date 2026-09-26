@@ -143,17 +143,17 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
         <span class="thumb">${p.images?.[0] ? `<img src="/${escapeHtml(p.images[0])}" alt="" loading="lazy">` : ""}</span>
         <span class="meta"><b>${escapeHtml(p.title)}</b><small>${money(p.price, store)} · ${sizes}</small></span><span class="go">›</span></a>`;
     }).join("");
-    return html(`<header class="bar"><h1>${escapeHtml(store.name)}</h1>${demo ? "" : `<a class="ghost" href="/admin/out">Sign out</a>`}</header>
+    return html(`${adminNav("/admin")}<header class="bar"><h1>${escapeHtml(store.name)}</h1>${demo ? "" : `<a class="ghost" href="/admin/out">Sign out</a>`}</header>
       ${demo ? `<p class="demo">You're looking at the admin of a made-up band's store. Everything works except saving. <a href="https://github.com/rattlesnake-ike/merch-table">This is the store</a>.</p>` : ""}
       <p class="sub">Tap a product to change its price, mark a size sold out, or hide it. Changes go live straight away.</p>
       <div class="list">${rows}</div>
-      <p class="fine"><a href="/admin/orders">Orders</a> · <a href="/admin/door">Door</a> · <a href="/">See the store</a> · <a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
+      <p class="fine"><a href="/api/setup">Setup check</a> · ${demo ? "a look around: nothing here can be changed" : `signed in as ${escapeHtml(me.email)}`}</p>`);
   }
 
   if (path.startsWith("/admin/p/")) {
     const id = decodeURIComponent(path.slice("/admin/p/".length));
     const p = products.find((x) => x.id === id);
-    if (!p) return html(`<h1>Not found</h1><p><a href="/admin">Back</a></p>`, 404);
+    if (!p) return html(`${adminNav("/admin", { href: "/admin", label: "All products" })}<h1>Not found</h1>`, 404);
 
     if (req.method === "POST") {
       const form = await req.formData();
@@ -174,7 +174,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
     }
 
     const sizes = p.variants.map((v) => `<label class="sw" data-sz><input type="checkbox" name="v_${escapeHtml(v.id)}" ${v.available === false ? "" : "checked"}><span>${escapeHtml(v.title)}</span><small data-state>${v.available === false ? "sold out" : "in stock"}</small></label>`).join("");
-    return html(`<header class="bar"><a class="ghost" href="/admin">‹ All products</a></header>
+    return html(`${adminNav("/admin", { href: "/admin", label: "All products" })}<header class="bar"><h1>${escapeHtml(p.title)}</h1></header>
       <form method="post"><input type="hidden" name="_t" value="${await csrfToken(env.SESSION_SECRET, me)}">
         ${p.images?.[0] ? `<img class="hero" src="/${escapeHtml(p.images[0])}" alt="">` : ""}
         <label for="title">Name</label><input id="title" name="title" value="${escapeHtml(p.title)}" required>
@@ -231,14 +231,14 @@ async function doorScreen(req, env, url, store, products, me, demo) {
     const countLine = counts.length
       ? `<p class="count">${counts.map((c) => `<span><b>${c.inRoom}</b> in the room${typeof c.capacity === "number" ? ` of ${c.capacity}` : ""} · ${escapeHtml(c.title)}</span>`).join("")}</p>`
       : "";
-    return `<h1>Door</h1>
+    return `${adminNav("/admin/door")}<h1>Door</h1>
     ${shows.length ? `<p class="sub">${shows.map((p) => escapeHtml(p.show.title ?? p.title)).join(" · ")}</p>` : `<p class="sub">No upcoming shows in the store.</p>`}
     ${countLine}
     ${msg}
     <form method="post"><input type="hidden" name="_t" value="${demo ? "" : await csrfToken(env.SESSION_SECRET, me)}">
       <input name="code" required autofocus autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-1234" aria-label="Ticket code" inputmode="latin">
       <button type="submit">Check in</button></form>
-    <p class="fine"><a href="/admin">Products</a> · <a href="/admin/orders">Orders</a></p>`;
+    `;
   };
 
   if (req.method !== "POST") return page(await form());
@@ -308,12 +308,12 @@ async function ordersScreen(req, env, url, store, me, demo) {
            <div style="display:flex;gap:8px;flex-wrap:wrap"><input name="carrier" placeholder="USPS" list="carriers" style="flex:0 0 7rem"><input name="tracking" placeholder="Tracking number" style="flex:1;min-width:10rem"><button type="submit" style="width:auto;margin:0;padding:10px 16px">Shipped</button></div></form>`}
     </div>`;
   };
-  return html(`<header class="bar"><h1>Orders</h1><a class="ghost" href="/admin">Products</a></header>
+  return html(`${adminNav("/admin/orders")}<header class="bar"><h1>Orders</h1></header>
     ${demo ? `<p class="demo">A real store lists its orders here, with a box to put the tracking number in. There are none on the demo.</p>` : ""}
     ${url.searchParams.get("saved") ? `<p class="demo" style="background:#e8f5e9;border-color:#a5c8a9">Marked shipped. That tracking number is the best protection you have if this is ever disputed.</p>` : ""}
     <datalist id="carriers"><option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Royal Mail</option></datalist>
     ${orders.length ? `<p class="sub">${toPack.length} to pack${orders.length - toPack.length ? `, ${orders.length - toPack.length} shipped` : ""}. Put the tracking number in when you post it: it is what answers a bank if a buyer ever says it never arrived.</p><div class="list">${orders.map(row).join("")}</div>` : demo ? "" : `<p class="sub">No orders yet. They appear here the moment someone pays.</p><p class="fine">Orders only arrive here if Stripe can reach your store: set the webhook (README step 6.4). Without it the store still sells, but this list stays empty.</p>`}
-    <p class="fine"><a href="/orders">What a buyer sees</a> · <a href="/admin">Products</a></p>`);
+    <p class="fine"><a href="/orders">What a buyer sees</a></p>`);
 }
 
 /** Everything a bank asks for, in the order Stripe's form asks for it, ready to paste. */
@@ -372,6 +372,18 @@ async function sendLink(env, store, email, link) {
   console.log("ADMIN SIGN-IN LINK (no mail service configured):", link);
 }
 
+/**
+ * One nav on every admin screen, so it behaves like an admin and not like a pile of pages.
+ * `here` marks the current section; `back` is an explicit way out of a detail screen, because
+ * a phone's back gesture is not something to rely on after a form post.
+ */
+export function adminNav(here = "", back = null) {
+  const tabs = [["/admin", "Products"], ["/admin/orders", "Orders"], ["/admin/show", "Shows"], ["/admin/door", "Door"]];
+  const links = tabs.map(([href, label]) =>
+    `<a href="${href}"${href === here ? ' aria-current="page" class="on"' : ""}>${label}</a>`).join("");
+  return `<nav class="anav">${back ? `<a class="back" href="${back.href}">&larr; ${escapeHtml(back.label)}</a>` : ""}<div class="tabs">${links}</div><a class="out" href="/">See the store &rarr;</a></nav>`;
+}
+
 function page(body) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store admin</title><style>
 :root{--ink:#141416;--paper:#fff;--soft:#f4f3ef;--line:#d9d7d0;--accent:#2743d0}
@@ -393,6 +405,12 @@ a{color:var(--accent)}
 .meta small{color:#666;font-size:.85rem}
 .meta .out{text-decoration:line-through;color:#999}
 .go{color:#999;font-size:1.4rem}
+.anav{max-width:34rem;margin:0 auto 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 12px;background:var(--paper);border:1px solid var(--line);border-radius:10px}
+.anav .tabs{display:flex;gap:14px;flex:1;flex-wrap:wrap}
+.anav a{text-decoration:none;font-size:.95rem}
+.anav .on{font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+.anav .back{flex-basis:100%;font-weight:600}
+.anav .out{color:#666;font-size:.85rem}
 form{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px}
 label{display:block;font-weight:600;margin:16px 0 6px}
 label small{font-weight:400;color:#666}
@@ -435,9 +453,9 @@ async function showScreen(req, env, url, store, products, me, demo) {
   const p = shows.find((x) => x.id === id);
 
   if (!p) {
-    return html(`<h1>Shows</h1>${shows.length
+    return html(`${adminNav("/admin/show")}<h1>Shows</h1>${shows.length
       ? `<ul class="pl">${shows.map((x) => `<li><a href="/admin/show?show=${encodeURIComponent(x.id)}">${escapeHtml(x.show.title ?? x.title)}</a><span class="d"></span><span class="sz">${escapeHtml(x.show.date ?? "")}${showOff(x) ? " · called off" : ""}</span></li>`).join("")}</ul>`
-      : `<p>No shows in this store yet.</p>`}<p class="fine"><a href="/admin">Products</a> · <a href="/admin/door">Door</a></p>`);
+      : `<p>No shows in this store yet.</p>`}`);
   }
 
   const st = showStatus(p);
@@ -457,7 +475,7 @@ async function showScreen(req, env, url, store, products, me, demo) {
   }
 
   const owed = preview.refunded.length;
-  return html(`<h1>${escapeHtml(p.show.title ?? p.title)}</h1>
+  return html(`${adminNav("/admin/show", { href: "/admin/show", label: "All shows" })}<h1>${escapeHtml(p.show.title ?? p.title)}</h1>
     <p class="sub">${escapeHtml(p.show.venue ?? "")}${p.show.city ? `, ${escapeHtml(p.show.city)}` : ""} · ${escapeHtml(p.show.date ?? "")}${st.state === "cancelled" ? " · called off" : st.state === "moved" ? ` · moved to ${escapeHtml(st.to)}` : ""}</p>
     ${st.state === "on"
       ? `<div class="warn"><p><b>This show is still on.</b> To call it off, set <code>"cancelled": true</code> inside its <code>show</code> block in <code>products.json</code> and deploy. Every ticket for the night will say so, and it stops being buyable straight away. Then come back here to refund.</p></div>`
