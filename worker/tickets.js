@@ -56,6 +56,22 @@ export function showOver(p, now = Date.now()) {
   return Number.isFinite(end.getTime()) ? end.getTime() < now : false;
 }
 
+/**
+ * A show can be called off or moved, and the person who paid has to find that out from the ticket
+ * they are holding — not on the pavement outside a dark room. `show.cancelled` or `show.moved_to`
+ * in products.json is the whole mechanism; the band writes one line and every ticket for that
+ * night says so, whether or not the fan ever gets an email.
+ */
+export function showStatus(p) {
+  const sh = p?.show ?? {};
+  if (sh.cancelled) return { state: "cancelled", note: typeof sh.cancelled === "string" ? sh.cancelled : null };
+  if (sh.moved_to) return { state: "moved", to: sh.moved_to, note: sh.moved_note ?? null };
+  return { state: "on" };
+}
+
+/** A called-off show cannot be sold, whatever its date says. */
+export const showOff = (p) => showStatus(p).state === "cancelled";
+
 /** The tickets in one paid order. */
 export async function ticketsForOrder(env, order, products) {
   const out = [];
@@ -94,14 +110,23 @@ export function ticketHtml(t, order, store, used) {
   const show = t.product.show;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const when = new Date(`${show.date}T${show.time ?? "20:00"}:00`).toLocaleString(store.locale ?? "en-US", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit" });
-  return `<article class="tkt${used ? " used" : ""}">
+  const st = showStatus(t.product);
+  // The person holding this paid for it. If the night is off or moved, that is the first thing
+  // on the ticket, above everything else — not a line they have to hunt for.
+  const banner = st.state === "cancelled"
+    ? `<p class="off"><b>This show was called off.</b> ${esc(st.note ?? `Your money is being refunded to the card you paid with. It usually lands in a few working days. If it hasn't, write to ${store.email ?? "the band"} and a person will sort it out.`)}</p>`
+    : st.state === "moved"
+      ? `<p class="moved"><b>This show has moved to ${esc(st.to)}.</b> ${esc(st.note ?? "Your ticket still works on the new date. If you can't make it, write and we'll refund you.")}</p>`
+      : "";
+  return `<article class="tkt${used ? " used" : ""}${st.state !== "on" ? " changed" : ""}">
     <p class="who">${esc(store.name)}</p>
+    ${banner}
     <h2>${esc(show.title ?? t.product.title)}</h2>
     <p class="where">${esc(show.venue ?? "")}${show.city ? `, ${esc(show.city)}` : ""}</p>
     <p class="when">${esc(when)}${show.doors ? ` · doors ${esc(show.doors)}` : ""}</p>
     <p class="code" aria-label="Ticket code">${esc(t.code)}</p>
     <p class="holder">${esc(order.name ?? order.email ?? "")}${t.variant && t.variant !== "one" ? ` · ${esc(t.variant)}` : ""}</p>
-    ${used ? `<p class="stamp">Already checked in</p>` : ""}
+    ${used ? `<p class="stamp">Already checked in</p>` : ""}${st.state === "cancelled" ? `<p class="stamp">Not valid \u2014 show called off</p>` : ""}
   </article>`;
 }
 

@@ -5,7 +5,7 @@ import products from "../products.json" with { type: "json" };
 import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
 import { handleAdmin, currentAdmin } from "./admin.js";
 import { recordOrder, ordersForEmail, orderRows, getOrder, listOrders } from "./orders.js";
-import { isTicket, ticketProducts, ticketsForOrder, ticketHtml, usedAt, showOver, ticketsLeft } from "./tickets.js";
+import { isTicket, ticketProducts, ticketsForOrder, ticketHtml, usedAt, showOver, ticketsLeft, showOff } from "./tickets.js";
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, status);
@@ -148,6 +148,10 @@ async function ticketsPage(req, env, url) {
   main{max-width:30rem;margin:0 auto}
   h1{font-size:1.4rem;margin:.2rem 0 1rem}
   .tkt{background:#fff;color:#141416;border-radius:14px;padding:20px;margin:0 0 16px;text-align:center}
+  .tkt.changed{border:3px solid #b3261e}
+  .tkt .off,.tkt .moved{border-radius:10px;padding:12px;margin:0 0 14px;text-align:left;font-size:.95rem;line-height:1.45}
+  .tkt .off{background:#fde7e5;color:#5f1a17}
+  .tkt .moved{background:#fff4d6;color:#5b4708}
   .tkt .who{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin:0;color:#666}
   .tkt h2{font-size:1.3rem;margin:.3rem 0}
   .tkt .where,.tkt .when{margin:.2rem 0;font-size:.95rem}
@@ -239,7 +243,7 @@ export function keyProblem(k) {
   return null;
 }
 
-async function stripe(env, method, path, body) {
+export async function stripe(env, method, path, body) {
   const problem = keyProblem(env.STRIPE_SECRET_KEY);
   if (problem) throw new StripeError(`Checkout isn't connected yet: ${problem}`, 503);
   const res = await fetch(`https://api.stripe.com/v1${path}`, { method, headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded", "stripe-version": "2025-08-27.basil" }, body: body ? form(body) : undefined });
@@ -276,6 +280,9 @@ async function checkout(req, env, url, products) {
     // easy to find, and an unannounced record must not be buyable before the band says so.
     if (p.hidden) return bad("Something in the cart isn't on the table any more. Remove it and try again.");
     if (isTicket(p) && showOver(p, now)) return bad(`${p.show.title ?? p.title} has already happened.`);
+    // Selling a ticket to a show that has been called off takes money for nothing. Refuse it here,
+    // server-side, so no stale page or cached cart can put a fan through checkout for a dead night.
+    if (isTicket(p) && showOff(p)) return bad(`${p.show.title ?? p.title} was called off, so it can't be bought.`);
     const sold = await soldCount(env, p.id, v.id);
     if (!variantAvailable(v, sold) || (typeof v.stock === "number" && v.stock - sold < qty)) { soldOut.push({ product: p.id, variant: v.id, title: `${p.title}${p.variants.length > 1 ? ` (${v.title})` : ""}` }); continue; }
     const price = variantPrice(p, v); subtotal += price * qty;

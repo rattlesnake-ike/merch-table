@@ -246,3 +246,42 @@ test("a show with no number sells without a limit, and says so by returning null
   assert.equal(allocationOf(open), null);
   assert.equal(ticketsLeft(open, 5), null);
 });
+
+// --- A called-off show, and the money owed back ---
+import { showStatus, showOff } from "../worker/tickets.js";
+import { ticketAmountFor } from "../worker/refunds.js";
+
+test("a called-off show says so on the ticket the fan is holding", () => {
+  const off = { show: { date: "2099-01-01", cancelled: true } };
+  assert.equal(showStatus(off).state, "cancelled");
+  assert.equal(showOff(off), true);
+  const moved = { show: { date: "2099-01-01", moved_to: "14 March" } };
+  assert.equal(showStatus(moved).state, "moved");
+  assert.equal(showStatus(moved).to, "14 March");
+  assert.equal(showOff(moved), false, "a moved show is still a show");
+  assert.equal(showStatus({ show: { date: "2099-01-01" } }).state, "on");
+});
+
+test("a refund covers the tickets to that show and nothing else in the basket", () => {
+  const products = [
+    { id: "show", price: 1800, variants: [{ id: "one", price: 1800 }], show: { date: "2099-01-01" } },
+    { id: "shirt", price: 3000, variants: [{ id: "m", price: 3000 }] },
+  ];
+  // two tickets and a shirt in one order
+  const order = { id: "o1", items: "show:one:2,shirt:m:1", paid: true, payment: "pi_1" };
+  assert.equal(ticketAmountFor(order, "show", products), 3600, "two tickets, not the shirt");
+  assert.equal(ticketAmountFor(order, "shirt", products), 0, "a shirt is not a ticket and is never auto-refunded");
+});
+
+test("an order with nothing for that show is left alone", () => {
+  const products = [{ id: "fri", price: 1000, variants: [{ id: "one", price: 1000 }], show: { date: "2099-01-01" } },
+                    { id: "sat", price: 1000, variants: [{ id: "one", price: 1000 }], show: { date: "2099-01-02" } }];
+  const order = { id: "o2", items: "sat:one:1", paid: true, payment: "pi_2" };
+  assert.equal(ticketAmountFor(order, "fri", products), 0);
+});
+
+test("a ticket's own variant price wins over the product price", () => {
+  const products = [{ id: "show", price: 1800, variants: [{ id: "early", price: 1200 }, { id: "door", price: 2500 }], show: { date: "2099-01-01" } }];
+  const order = { id: "o3", items: "show:early:2", paid: true, payment: "pi_3" };
+  assert.equal(ticketAmountFor(order, "show", products), 2400, "early-bird buyers get back what they actually paid");
+});

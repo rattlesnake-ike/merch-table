@@ -1,5 +1,6 @@
 import { listOrders, getOrder, markShipped, orderRows, trackingUrl, ticketByCode, backfillTicketIndex } from "./orders.js";
-import { isTicket, ticketProducts, ticketsForOrder, verifyCode, admit, usedAt, showOver, headcount } from "./tickets.js";
+import { refundShow } from "./refunds.js";
+import { isTicket, ticketProducts, ticketsForOrder, verifyCode, admit, usedAt, showOver, headcount, showStatus, showOff } from "./tickets.js";
 /* The band's own admin: sign in by emailed link, edit products on a phone, save, done.
    No GitHub, no files, no terminal. Live edits go to KV and the Worker serves them
    over the built pages; the repo stays the backup, not the bottleneck. */
@@ -133,6 +134,7 @@ async function screens(req, env, url, store, products, me, demo, saveProducts) {
 
   if (path === "/admin/orders" || path.startsWith("/admin/orders/")) return await ordersScreen(req, env, url, store, me, demo);
   if (path === "/admin/door" || path.startsWith("/admin/door/")) return await doorScreen(req, env, url, store, products, me, demo);
+  if (path === "/admin/show") return await showScreen(req, env, url, store, products, me, demo);
 
   if (path === "/admin" && req.method === "GET") {
     const rows = products.map((p) => {
@@ -416,4 +418,52 @@ document.querySelectorAll("[data-sz] input").forEach((i)=>i.addEventListener("ch
   const s=i.closest("[data-sz]").querySelector("[data-state]"); if(s) s.textContent=i.checked?"in stock":"sold out";
 }));
 </script></body></html>`;
+}
+
+
+/**
+ * A show that was called off, and the money owed back.
+ *
+ * "Be straight with people about refunds" is on the public page; this is the part that makes it
+ * true. The band marks the night off in products.json, opens this, sees exactly who is owed what,
+ * and presses one button. Nobody has to chase anyone.
+ */
+async function showScreen(req, env, url, store, products, me, demo) {
+  const html = (body, status = 200) => new Response(page(body), { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+  const shows = ticketProducts(products);
+  const id = url.searchParams.get("show") ?? "";
+  const p = shows.find((x) => x.id === id);
+
+  if (!p) {
+    return html(`<h1>Shows</h1>${shows.length
+      ? `<ul class="pl">${shows.map((x) => `<li><a href="/admin/show?show=${encodeURIComponent(x.id)}">${escapeHtml(x.show.title ?? x.title)}</a><span class="d"></span><span class="sz">${escapeHtml(x.show.date ?? "")}${showOff(x) ? " · called off" : ""}</span></li>`).join("")}</ul>`
+      : `<p>No shows in this store yet.</p>`}<p class="fine"><a href="/admin">Products</a> · <a href="/admin/door">Door</a></p>`);
+  }
+
+  const st = showStatus(p);
+  const preview = await refundShow(env, p.id, products, { dryRun: true }).catch((e) => ({ refunded: [], skipped: [], failed: [{ why: e.message }], total: 0 }));
+
+  if (req.method === "POST") {
+    const f = await req.formData();
+    if (!demo && !timingSafeEqual(String(f.get("_t") ?? ""), await csrfToken(env.SESSION_SECRET, me))) return html(`<div class="warn"><p>Reload the page: it had been open too long.</p></div>`, 403);
+    if (demo) return html(`<h1>${escapeHtml(p.show.title ?? p.title)}</h1><div class="warn"><p>A look around: nothing here can be changed.</p></div><p class="fine"><a href="/admin/show?show=${encodeURIComponent(p.id)}">Back</a></p>`);
+    const r = await refundShow(env, p.id, products);
+    return html(`<h1>${escapeHtml(p.show.title ?? p.title)}</h1>
+      <p><b>${r.refunded.length} refunded</b>, ${(r.total / 100).toFixed(2)} ${escapeHtml((r.currency ?? store.currency ?? "").toUpperCase())}.</p>
+      ${r.failed.length ? `<div class="warn"><p><b>${r.failed.length} could not be refunded.</b> These need doing by hand in Stripe, and the person is owed either way:</p><ul>${r.failed.map((x) => `<li>${escapeHtml(x.email ?? x.order ?? "?")} — ${escapeHtml(x.why)}</li>`).join("")}</ul></div>` : ""}
+      ${r.skipped.length ? `<p class="fine">${r.skipped.length} skipped (${escapeHtml([...new Set(r.skipped.map((x) => x.why))].join(", "))}).</p>` : ""}
+      <p class="fine">Now tell them. A refund without a message reads like a mistake.</p>
+      <p class="fine"><a href="/admin/show?show=${encodeURIComponent(p.id)}">Back to the show</a> · <a href="/admin/orders">Orders</a></p>`);
+  }
+
+  const owed = preview.refunded.length;
+  return html(`<h1>${escapeHtml(p.show.title ?? p.title)}</h1>
+    <p class="sub">${escapeHtml(p.show.venue ?? "")}${p.show.city ? `, ${escapeHtml(p.show.city)}` : ""} · ${escapeHtml(p.show.date ?? "")}${st.state === "cancelled" ? " · called off" : st.state === "moved" ? ` · moved to ${escapeHtml(st.to)}` : ""}</p>
+    ${st.state === "on"
+      ? `<div class="warn"><p><b>This show is still on.</b> To call it off, set <code>"cancelled": true</code> inside its <code>show</code> block in <code>products.json</code> and deploy. Every ticket for the night will say so, and it stops being buyable straight away. Then come back here to refund.</p></div>`
+      : `<p>${owed ? `<b>${owed} ${owed === 1 ? "person is" : "people are"} owed ${(preview.total / 100).toFixed(2)} ${escapeHtml((preview.currency ?? store.currency ?? "").toUpperCase())}.</b>` : "<b>Nobody is owed anything for this show.</b>"}</p>`}
+    ${preview.refunded.length ? `<ul class="pl">${preview.refunded.map((x) => `<li>${escapeHtml(x.email ?? x.order)}<span class="d"></span><span class="pr">${(x.cents / 100).toFixed(2)}</span></li>`).join("")}</ul>` : ""}
+    ${preview.failed.length ? `<div class="warn"><p>${preview.failed.length} cannot be refunded automatically: ${escapeHtml([...new Set(preview.failed.map((x) => x.why))].join("; "))}</p></div>` : ""}
+    ${st.state !== "on" && owed ? `<form method="post"><input type="hidden" name="_t" value="${demo ? "" : await csrfToken(env.SESSION_SECRET, me)}"><button type="submit">Refund all ${owed}</button></form><p class="fine">Refunds only the tickets to this show. Anything else in the same order — a record, a shirt — is still coming and is not touched.</p>` : ""}
+    <p class="fine"><a href="/admin/show">All shows</a> · <a href="/admin/door">Door</a> · <a href="/admin">Products</a></p>`);
 }
