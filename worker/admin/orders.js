@@ -64,7 +64,7 @@ export async function ordersScreen(req, env, url, store, products, me, demo, tok
       ${o.status === "shipped" ? `<div class="card"><b>Shipped</b> ${when(o.shippedAt, store)}${o.tracking ? ` · ${t ? `<a href="${t}" rel="noopener" target="_blank">${escapeHtml(o.carrier || "track")} ${escapeHtml(o.tracking)} ↗</a>` : `${escapeHtml(o.carrier ?? "")} ${escapeHtml(o.tracking)}`}` : ""}</div>` : o.status === "refunded" ? "" : `
       <form method="post" class="card">${hidden}<input type="hidden" name="id" value="${escapeHtml(o.id)}">
         <b>Mark it shipped</b>
-        <div class="two"><label for="carrier">Carrier</label><label for="tracking">Tracking number</label><input id="carrier" name="carrier" list="carriers" placeholder="USPS"><input id="tracking" name="tracking" placeholder="9400 1118 …" autocomplete="off"></div>
+        <div class="two"><div><label for="carrier">Carrier</label><input id="carrier" name="carrier" list="carriers" placeholder="USPS"></div><div><label for="tracking">Tracking number</label><input id="tracking" name="tracking" placeholder="9400 1118 …" autocomplete="off"></div></div>
         <datalist id="carriers"><option>USPS</option><option>UPS</option><option>FedEx</option><option>DHL</option><option>Royal Mail</option></datalist>
         <button type="submit">Shipped</button>
         <p class="fine" style="margin:10px 0 0">Put the tracking number in when you post it: it is what answers a bank if a buyer ever says it never arrived.</p></form>`}
