@@ -1,7 +1,7 @@
 {
   "name": "Northern Dogs",
   "tagline": "Records, shirts and the odd thing, straight from the van.",
-  "description": "The official merch table of Northern Dogs. Everything here ships from our own closet in Queens.",
+  "description": "The official merch table of Northern Dogs, a five-piece from Sunnyside, Queens. Everything here ships from our own closet; a person packs it and a person answers the email.",
   "currency": "usd",
   "locale": "en-US",
   "email": "hello@example.com",
@@ -13,7 +13,11 @@
     },
     {
       "label": "Shows",
-      "url": "https://example.com/shows"
+      "url": "/#shows"
+    },
+    {
+      "label": "Records",
+      "url": "/#music"
     }
   ],
   "colors": {
@@ -30,7 +34,7 @@
       ],
       "amount": 600,
       "free_over": 7500,
-      "estimate": "3 to 7 business days"
+      "estimate": "3 to 7 business days, from Queens"
     },
     {
       "id": "ca",
@@ -65,6 +69,7 @@
         "AU",
         "NZ",
         "JP",
+        "KR",
         "MX",
         "BR"
       ],
@@ -82,7 +87,7 @@
   },
   "sections": [
     {
-      "kind": "other",
+      "kind": "shows",
       "title": "Shows"
     },
     {
@@ -94,6 +99,14 @@
       "title": "Shirts and hoodies"
     },
     {
+      "kind": "hats",
+      "title": "Hats"
+    },
+    {
+      "kind": "prints",
+      "title": "Posters and prints"
+    },
+    {
       "kind": "accessories",
       "title": "Small things"
     },
@@ -102,8 +115,8 @@
       "title": "The odd thing"
     },
     {
-      "kind": "prints",
-      "title": "Posters"
+      "kind": "dog",
+      "title": "For the dog"
     }
   ],
   "owners": [],
@@ -114,6 +127,7 @@
   },
   "statement_descriptor": "NORTHERN DOGS",
   "terms_url": true,
+  "returns": "Wrong size, or something arrived damaged? Write to us within 30 days and we'll swap it or refund it. You cover return postage for a size swap; we cover it if it's our mistake. Records that skip get replaced, no questions.",
   "wallets": {
     "_comment": "Optional. Put your OWN receiving address here to take coin directly, e.g. \"btc\": \"bc1q...\". Leave empty and none of this exists.",
     "btc": "",

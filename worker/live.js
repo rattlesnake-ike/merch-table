@@ -80,7 +80,7 @@ export async function liveProducts(env, hint) {
 }
 
 /** The fields of store.json the admin may change. Shipping, currency and sections stay in the file. */
-export const STORE_FIELDS = ["name", "tagline", "description", "email", "homepage", "colors", "look", "returns", "sold_out_text"];
+export const STORE_FIELDS = ["name", "tagline", "description", "email", "homepage", "colors", "look", "returns", "sold_out_text", "links", "sections", "shipping", "mailing_list", "phone_at_checkout", "statement_descriptor", "tax", "currency", "locale"];
 
 /** store.json with the band's live settings on top. The contact address falls back to the owner. */
 export async function liveStore(env, hint) {
@@ -206,9 +206,41 @@ export async function saveStore(env, patch, who, hint) {
   if (!env.STOCK) return { ok: false, error: NO_KV };
   const over = (await readRecord(env, "store", hint)) ?? {};
   for (const k of STORE_FIELDS) if (patch[k] !== undefined) over[k] = patch[k];
+  const merged = { ...store0 }; for (const k of STORE_FIELDS) if (over[k] !== undefined) merged[k] = over[k];
+  const errs = validate(merged, []);
+  if (errs.length) return { ok: false, error: errs[0] };
   const v = await writeRecord(env, "store", over);
   await log(env, who, "store settings");
   return { ok: true, fresh: { store: v } };
+}
+
+/* ---------- Stock counting (KV). sold:<product>:<variant> = number sold so far. ---------- */
+export const soldKey = (p, v) => `sold:${p}:${v}`;
+export async function soldCount(env, p, v) { if (!env.STOCK) return 0; return Number((await env.STOCK.get(soldKey(p, v))) ?? 0); }
+/** Every product's sold counts in one go, for the admin. { "pid:vid": n } */
+export async function soldCounts(env, products) {
+  const out = {};
+  if (!env.STOCK) return out;
+  await Promise.all(products.flatMap((p) => p.variants.map(async (v) => { if (typeof v.stock === "number") out[`${p.id}:${v.id}`] = await soldCount(env, p.id, v.id); })));
+  return out;
+}
+
+/** The log of what changed, newest first. */
+export async function recentChanges(env, n = 20) {
+  if (!env.STOCK) return [];
+  try { return JSON.parse((await env.STOCK.get("editlog")) ?? "[]").slice(0, n); } catch { return []; }
+}
+
+/** A logo the band uploaded in the admin (SVG or PNG), served at /favicon.svg and /logo. */
+export async function putLogo(env, bytes, type) {
+  if (!env.STOCK) return false;
+  await env.STOCK.put("logo", bytes, { metadata: { type } });
+  return true;
+}
+export async function getLogo(env) {
+  if (!env.STOCK) return null;
+  const got = await env.STOCK.getWithMetadata("logo", "arrayBuffer");
+  return got?.value ? { bytes: got.value, type: got.metadata?.type ?? "image/svg+xml" } : null;
 }
 
 /* ---------- Images the band adds from a phone, kept in KV and served from this site ----------

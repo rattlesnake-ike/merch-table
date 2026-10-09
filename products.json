@@ -1,50 +1,230 @@
 [
   {
+    "sample": true,
+    "id": "release-show-brooklyn",
+    "title": "Harbor Lights release show — Brooklyn",
+    "price": 1800,
+    "kind": "shows",
+    "description": "The record comes out that morning and we play the whole thing that night, then the old ones. First 120 tickets are advance; the rest at the door if any are left. Your ticket is a code on your phone; the door is us.",
+    "images": [
+      "images/release-show-brooklyn.svg"
+    ],
+    "variants": [
+      {
+        "id": "advance",
+        "title": "Advance",
+        "available": true,
+        "stock": 120
+      }
+    ],
+    "show": {
+      "title": "Harbor Lights release show",
+      "venue": "The Broadway",
+      "city": "Brooklyn, NY",
+      "date": "2026-11-13",
+      "time": "20:00",
+      "doors": "8pm",
+      "allocation": 120,
+      "room_capacity": 250,
+      "venue_contact": "door@thebroadway.example"
+    },
+    "published": "2026-10-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "winter-show-queens",
+    "title": "Winter show — Queens",
+    "price": 1500,
+    "kind": "shows",
+    "description": "A home game. Two sets, a long break, the bar's good. All ages until 10.",
+    "images": [
+      "images/winter-show-queens.svg"
+    ],
+    "variants": [
+      {
+        "id": "advance",
+        "title": "Advance",
+        "available": true,
+        "stock": 80
+      }
+    ],
+    "show": {
+      "title": "Winter show",
+      "venue": "The Windjammer",
+      "city": "Queens, NY",
+      "date": "2026-12-05",
+      "time": "20:00",
+      "doors": "7pm",
+      "allocation": 80,
+      "room_capacity": 120
+    },
+    "published": "2026-10-08T12:00:00Z"
+  },
+  {
+    "sample": true,
     "id": "harbor-lights-lp",
     "title": "Harbor Lights LP (sea-glass green)",
     "price": 2800,
     "kind": "music",
-    "description": "Our second record on 140g sea-glass green vinyl. Limited to 500. Gatefold sleeve, printed inner, download code.\n\nShips the week of the release. Order now and it goes out first.",
+    "description": "Our second record, pressed on 140g sea-glass green vinyl at a plant in New Jersey we drove to. Limited to 500, each one numbered on the back by whoever's in the van. Gatefold sleeve, printed inner with the lyrics, download code.\n\nShips the week of the release. Order now and it goes out first.",
     "images": [
       "images/harbor-lights-lp.svg"
     ],
     "variants": [
       {
         "id": "green",
-        "title": "Sea-glass green",
+        "title": "Sea-glass green, numbered of 500",
         "available": true,
         "stock": 500
       }
     ],
     "ship_date": "2026-11-13",
-    "published": "2026-09-20T12:00:00Z",
-    "sample": true
+    "published": "2026-09-20T12:00:00Z"
   },
   {
+    "sample": true,
+    "id": "harbor-lights-lp-white",
+    "title": "Harbor Lights LP (Queens edition, lighthouse white)",
+    "price": 3000,
+    "kind": "music",
+    "description": "Same record, different sleeve: the Queens edition has a second cover painted by Mariela Cruz, who did the van, and comes on lighthouse-white vinyl. 300 of these, only from this store. Gatefold, printed inner, download code.",
+    "images": [
+      "images/harbor-lights-lp-white.svg"
+    ],
+    "variants": [
+      {
+        "id": "white",
+        "title": "Lighthouse white, of 300",
+        "available": true,
+        "stock": 300
+      }
+    ],
+    "ship_date": "2026-11-13",
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-lights-lp-black",
+    "title": "Harbor Lights LP (black)",
+    "price": 2500,
+    "kind": "music",
+    "description": "The plain black one. Same 140g pressing, same gatefold, same lyrics inside, no number on the back. Repressed as long as people want it.",
+    "images": [
+      "images/harbor-lights-lp-black.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "Black vinyl",
+        "available": true
+      }
+    ],
+    "ship_date": "2026-11-13",
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "sample": true,
     "id": "harbor-lights-cassette",
     "title": "Harbor Lights cassette",
     "price": 1200,
     "kind": "music",
-    "description": "Clear shell, blue ink, J-card with the lyrics. Dubbed in real time.",
+    "description": "Clear shell, blue ink, J-card with the lyrics and a photo of the van at the ferry. Dubbed in real time by a man in Ridgewood who has done this since 1989. Download code inside.",
     "images": [
       "images/harbor-lights-cassette.svg"
     ],
     "variants": [
       {
         "id": "one",
-        "title": "Cassette",
+        "title": "Clear shell",
         "available": true
       }
     ],
-    "published": "2026-09-20T12:00:00Z",
-    "sample": true
+    "published": "2026-09-20T12:00:00Z"
   },
   {
+    "sample": true,
+    "id": "harbor-lights-cd",
+    "title": "Harbor Lights CD",
+    "price": 1400,
+    "kind": "music",
+    "description": "For the car, the parents, and the one friend who still has a player. Cardboard sleeve, eight-page booklet.",
+    "images": [
+      "images/harbor-lights-cd.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "CD",
+        "available": true
+      }
+    ],
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "skillman-ave-7",
+    "title": "Skillman Ave 7\" (b-side unreleased)",
+    "price": 1200,
+    "kind": "music",
+    "description": "The single, with a B-side that isn't on the record and isn't going online: \"Cheap Flight to Nowhere\", recorded live in the basement in one take. Mustard label, red sleeve, 250 copies.",
+    "images": [
+      "images/skillman-ave-7.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "7\" single, of 250",
+        "available": true,
+        "stock": 250
+      }
+    ],
+    "published": "2026-08-15T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "live-at-the-broadway",
+    "title": "Live at The Broadway 2LP",
+    "price": 3200,
+    "kind": "music",
+    "description": "Both sets from last December, straight off the desk, with the bit where the power went and the room sang the chorus anyway. 2LP black, wide-spine sleeve, a photo insert from the balcony.",
+    "images": [
+      "images/live-at-the-broadway.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "2LP black",
+        "available": true
+      }
+    ],
+    "published": "2026-06-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "northern-dogs-lp",
+    "title": "Northern Dogs LP (repress, dog-brown)",
+    "price": 2600,
+    "kind": "music",
+    "description": "The first record, back after three years out of print. Dog-brown vinyl this time, same sleeve, the lyric sheet corrected (sorry about \"breathe\").",
+    "images": [
+      "images/northern-dogs-lp.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "Dog-brown vinyl",
+        "available": true
+      }
+    ],
+    "published": "2026-07-10T12:00:00Z"
+  },
+  {
+    "sample": true,
     "id": "dog-logo-tee",
     "title": "Dog logo tee",
-    "price": 2500,
+    "price": 3500,
     "kind": "apparel",
-    "description": "Heavyweight cotton, printed by hand in Ridgewood. Runs true to size.",
+    "description": "The dog, on the chest, on a natural Comfort Colors 1717 — heavyweight 6.1 oz cotton, garment-dyed, boxy. Printed by hand in Ridgewood. Runs true to size; the 2XL and 3XL cost us more, so they cost you $3 more. Back print says where we're from.",
     "images": [
       "images/dog-logo-tee.svg",
       "images/dog-logo-tee-back.svg"
@@ -74,20 +254,27 @@
         "id": "2xl",
         "title": "2XL",
         "available": true,
-        "price": 2800
+        "price": 3800
+      },
+      {
+        "id": "3xl",
+        "title": "3XL",
+        "available": true,
+        "price": 3800
       }
     ],
-    "published": "2026-08-01T12:00:00Z",
-    "sample": true
+    "published": "2026-08-01T12:00:00Z"
   },
   {
-    "id": "van-hoodie",
-    "title": "Van hoodie",
-    "price": 5500,
+    "sample": true,
+    "id": "harbor-lights-tour-tee",
+    "title": "Harbor Lights tour tee (dates on the back)",
+    "price": 3500,
     "kind": "apparel",
-    "description": "The van, embroidered, on a heavy fleece pullover. Warm enough for load-out in February.",
+    "description": "We read the comments and we know some of you want the dates on the back. This one's for you. Lighthouse on the front, every date of the fall run on the back, on a black Comfort Colors 1717.",
     "images": [
-      "images/van-hoodie.svg"
+      "images/harbor-lights-tour-tee.svg",
+      "images/harbor-lights-tour-tee-back.svg"
     ],
     "variants": [
       {
@@ -109,141 +296,75 @@
         "id": "xl",
         "title": "XL",
         "available": true
-      }
-    ],
-    "published": "2026-08-01T12:00:00Z",
-    "sample": true
-  },
-  {
-    "id": "harbor-cap",
-    "title": "Harbor cap",
-    "price": 3000,
-    "kind": "apparel",
-    "description": "Unstructured six-panel, brass buckle, the lighthouse stitched small on the front.",
-    "images": [
-      "images/harbor-cap.svg"
-    ],
-    "variants": [
-      {
-        "id": "one",
-        "title": "One size",
-        "available": true
-      }
-    ],
-    "published": "2026-08-15T12:00:00Z",
-    "sample": true
-  },
-  {
-    "id": "enamel-pin-set",
-    "title": "Enamel pin set",
-    "price": 1400,
-    "kind": "accessories",
-    "description": "Three pins: the dog, the van, the lighthouse. Rubber clutches.",
-    "images": [
-      "images/enamel-pin-set.svg"
-    ],
-    "variants": [
-      {
-        "id": "one",
-        "title": "Set of three",
-        "available": true
-      }
-    ],
-    "published": "2026-08-15T12:00:00Z",
-    "sample": true
-  },
-  {
-    "id": "canvas-tote",
-    "title": "Canvas tote",
-    "price": 1800,
-    "kind": "unusual",
-    "description": "Natural canvas, one colour print. Holds twelve records or a week of groceries.",
-    "images": [
-      "images/canvas-tote.svg"
-    ],
-    "variants": [
-      {
-        "id": "one",
-        "title": "Tote",
-        "available": true
-      }
-    ],
-    "published": "2026-08-15T12:00:00Z",
-    "hidden": true,
-    "sample": true
-  },
-  {
-    "id": "fall-tour-poster",
-    "title": "Fall tour poster",
-    "price": 2000,
-    "kind": "prints",
-    "description": "18 × 24 inches, two-colour screen print on French Paper, signed and numbered edition of 150.",
-    "images": [
-      "images/fall-tour-poster.svg"
-    ],
-    "variants": [
-      {
-        "id": "one",
-        "title": "Poster",
-        "available": true,
-        "stock": 150
-      }
-    ],
-    "published": "2026-09-10T12:00:00Z",
-    "sample": true
-  },
-  {
-    "id": "harbor-lights-bundle",
-    "title": "Harbor Lights bundle: LP + tee",
-    "price": 4800,
-    "compare_at": 5300,
-    "kind": "music",
-    "description": "The sea-glass green LP and the dog logo tee together, five dollars off. Ships together when the record does.",
-    "images": [
-      "images/harbor-lights-bundle.svg"
-    ],
-    "bundle": [
-      {
-        "product": "harbor-lights-lp",
-        "variant": "green"
       },
       {
-        "product": "dog-logo-tee",
-        "variant": "*"
+        "id": "2xl",
+        "title": "2XL",
+        "available": true,
+        "price": 3800
+      },
+      {
+        "id": "3xl",
+        "title": "3XL",
+        "available": true,
+        "price": 3800
       }
+    ],
+    "published": "2026-09-28T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "get-in-tee",
+    "title": "Get In tee",
+    "price": 3500,
+    "kind": "apparel",
+    "description": "The van, and the two words we say most. Sand Comfort Colors 1717, two-colour print.",
+    "images": [
+      "images/get-in-tee.svg"
     ],
     "variants": [
       {
         "id": "s",
-        "title": "Tee S",
+        "title": "S",
         "available": true
       },
       {
         "id": "m",
-        "title": "Tee M",
+        "title": "M",
         "available": true
       },
       {
         "id": "l",
-        "title": "Tee L",
-        "available": false
+        "title": "L",
+        "available": true
       },
       {
         "id": "xl",
-        "title": "Tee XL",
+        "title": "XL",
         "available": true
+      },
+      {
+        "id": "2xl",
+        "title": "2XL",
+        "available": true,
+        "price": 3800
+      },
+      {
+        "id": "3xl",
+        "title": "3XL",
+        "available": true,
+        "price": 3800
       }
     ],
-    "ship_date": "2026-11-13",
-    "published": "2026-09-20T12:00:00Z",
-    "sample": true
+    "published": "2026-05-14T12:00:00Z"
   },
   {
+    "sample": true,
     "id": "lighthouse-long-sleeve",
     "title": "Lighthouse long sleeve",
     "price": 3800,
     "kind": "apparel",
-    "description": "Cream long sleeve, lighthouse down the arm. Goes on sale at the release show.",
+    "description": "Night-blue Comfort Colors 6014, the lighthouse on the chest, the beam running down the left sleeve. Goes on sale the night of the release show, here, at nine.",
     "images": [
       "images/lighthouse-long-sleeve.svg"
     ],
@@ -267,41 +388,694 @@
         "id": "xl",
         "title": "XL",
         "available": true
+      },
+      {
+        "id": "2xl",
+        "title": "2XL",
+        "available": true
       }
     ],
-    "live_at": "2026-11-13T20:00:00-05:00",
-    "published": "2026-09-25T12:00:00Z",
-    "sample": true
+    "live_at": "2026-11-13T21:00:00-05:00",
+    "published": "2026-10-08T12:00:00Z"
   },
   {
-    "id": "release-show-brooklyn",
-    "title": "Harbor Lights release show — Brooklyn",
-    "price": 1800,
-    "kind": "other",
-    "description": "Our record release show. Doors at 8, we play at 9:30.\n\nTickets are sold by us, not a ticketing company: the price you see is the price you pay.",
+    "sample": true,
+    "id": "van-hoodie",
+    "title": "Van hoodie",
+    "price": 6500,
+    "kind": "apparel",
+    "description": "The van, embroidered, on an Independent Trading Co. heavyweight pullover — 10 oz fleece, warm enough for load-out in February. The embroidery is 9,000 stitches; we counted once.",
+    "images": [
+      "images/van-hoodie.svg"
+    ],
+    "variants": [
+      {
+        "id": "s",
+        "title": "S",
+        "available": true
+      },
+      {
+        "id": "m",
+        "title": "M",
+        "available": true
+      },
+      {
+        "id": "l",
+        "title": "L",
+        "available": true
+      },
+      {
+        "id": "xl",
+        "title": "XL",
+        "available": true
+      },
+      {
+        "id": "2xl",
+        "title": "2XL",
+        "available": true
+      }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "nobody-walks-crewneck",
+    "title": "Nobody Walks in Queens crewneck",
+    "price": 4800,
+    "kind": "apparel",
+    "description": "A line from the song, in big letters, on a mustard Independent crewneck. Nobody does. We drive everywhere.",
+    "images": [
+      "images/nobody-walks-crewneck.svg"
+    ],
+    "variants": [
+      {
+        "id": "s",
+        "title": "S",
+        "available": true
+      },
+      {
+        "id": "m",
+        "title": "M",
+        "available": true
+      },
+      {
+        "id": "l",
+        "title": "L",
+        "available": true
+      },
+      {
+        "id": "xl",
+        "title": "XL",
+        "available": true
+      },
+      {
+        "id": "2xl",
+        "title": "2XL",
+        "available": true
+      }
+    ],
+    "published": "2026-03-20T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "kids-dog-tee",
+    "title": "Kids' dog tee",
+    "price": 2500,
+    "kind": "apparel",
+    "description": "The dog, smaller, on a pink Rabbit Skins fine-jersey tee. For the ones who came to soundcheck.",
+    "images": [
+      "images/kids-dog-tee.svg"
+    ],
+    "variants": [
+      {
+        "id": "2t",
+        "title": "2T",
+        "available": true
+      },
+      {
+        "id": "4t",
+        "title": "4T",
+        "available": true
+      },
+      {
+        "id": "5-6",
+        "title": "5–6",
+        "available": true
+      },
+      {
+        "id": "youth-s",
+        "title": "Youth S",
+        "available": true
+      },
+      {
+        "id": "youth-m",
+        "title": "Youth M",
+        "available": true
+      }
+    ],
+    "published": "2026-06-15T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-socks",
+    "title": "Harbor socks",
+    "price": 1600,
+    "kind": "apparel",
+    "description": "Blue stripes, combed cotton, knitted in North Carolina. One size fits roughly everyone in the band, which covers 7 to 13.",
+    "images": [
+      "images/harbor-socks.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "One size, a pair",
+        "available": true
+      }
+    ],
+    "published": "2026-09-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "dog-logo-tee-irregular",
+    "title": "Dog logo tee [irregular]",
+    "price": 1500,
+    "compare_at": 3500,
+    "kind": "apparel",
+    "description": "The print's a bit off-centre, or there's a smudge, or the label went in sideways. Same shirt otherwise. All sales final, and we'll tell you which flaw yours has if you ask.",
+    "images": [
+      "images/dog-logo-tee-irregular.svg"
+    ],
+    "variants": [
+      {
+        "id": "m",
+        "title": "M",
+        "available": true,
+        "stock": 4
+      },
+      {
+        "id": "l",
+        "title": "L",
+        "available": true,
+        "stock": 2
+      },
+      {
+        "id": "xl",
+        "title": "XL",
+        "available": true,
+        "stock": 4
+      }
+    ],
+    "published": "2026-09-30T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-cap",
+    "title": "Harbor cap",
+    "price": 3000,
+    "kind": "hats",
+    "description": "Unstructured six-panel dad hat, bio-washed chino twill, brass buckle. The dog, embroidered small. Natural.",
+    "images": [
+      "images/harbor-cap.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "One size",
+        "available": true
+      }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "dog-rope-hat",
+    "title": "Dog rope hat",
+    "price": 3800,
+    "kind": "hats",
+    "description": "Night-blue Richardson 256 with the rope across the brim. The dog in white thread. Flat bill; yes, you can bend it.",
+    "images": [
+      "images/dog-rope-hat.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "One size",
+        "available": true
+      }
+    ],
+    "published": "2026-09-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "northern-beanie",
+    "title": "Northern beanie",
+    "price": 2800,
+    "kind": "hats",
+    "description": "Cuffed acrylic beanie, night blue, NORTHERN across the cuff. Made for the river wind at the ferry.",
+    "images": [
+      "images/northern-beanie.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "One size",
+        "available": true
+      }
+    ],
+    "published": "2026-10-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-bucket-hat",
+    "title": "Harbor bucket hat",
+    "price": 3200,
+    "kind": "hats",
+    "description": "Sand cotton twill bucket hat, the dog on the front, a lighthouse on the back brim. Two sizes because heads are not one size.",
+    "images": [
+      "images/harbor-bucket-hat.svg"
+    ],
+    "variants": [
+      {
+        "id": "s-m",
+        "title": "S/M",
+        "available": true
+      },
+      {
+        "id": "l-xl",
+        "title": "L/XL",
+        "available": true
+      }
+    ],
+    "published": "2026-06-15T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "fall-tour-poster",
+    "title": "Fall tour 2026 screen print",
+    "price": 3000,
+    "kind": "prints",
+    "description": "Three-colour screen print by Mariela Cruz, 18\" × 24\" on French Paper, numbered of 150. The lighthouse, the dates, the blue. Ships rolled in a tube.",
     "images": [
       "images/fall-tour-poster.svg"
     ],
     "variants": [
       {
-        "id": "advance",
-        "title": "Advance",
+        "id": "one",
+        "title": "Numbered of 150",
         "available": true,
-        "stock": 120
+        "stock": 150
       }
     ],
-    "show": {
-      "title": "Harbor Lights release show",
-      "venue": "The Broadway",
-      "city": "Brooklyn, NY",
-      "date": "2026-11-13",
-      "time": "20:00",
-      "doors": "8pm",
-      "allocation": 120,
-      "room_capacity": 300,
-      "venue_contact": "boxoffice@thebroadway.example"
-    },
-    "published": "2026-09-26T12:00:00Z",
-    "sample": true
+    "published": "2026-09-28T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "release-show-poster",
+    "title": "Release show poster (signed, numbered of 60)",
+    "price": 4000,
+    "kind": "prints",
+    "description": "The poster for November 13 at The Broadway, 18\" × 24\", signed by all five of us and numbered of 60. The rest go on the merch table that night, so this is most of them.",
+    "images": [
+      "images/release-show-poster.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "Signed, numbered of 60",
+        "available": true,
+        "stock": 60
+      }
+    ],
+    "published": "2026-10-05T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "lighthouse-riso",
+    "title": "Lighthouse risograph print",
+    "price": 2000,
+    "kind": "prints",
+    "description": "11\" × 17\" two-colour riso (pink and blue, slightly misregistered on purpose) on 80 lb cover stock. Unlimited, so it stays $20.",
+    "images": [
+      "images/lighthouse-riso.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "11 × 17",
+        "available": true
+      }
+    ],
+    "published": "2026-07-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "enamel-pin-set",
+    "title": "Enamel pin set",
+    "price": 1400,
+    "kind": "accessories",
+    "description": "Three hard-enamel pins — the dog, the van, the lighthouse — on a backing card, with rubber clutches so they don't end up on the floor of the venue.",
+    "images": [
+      "images/enamel-pin-set.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "Set of three",
+        "available": true
+      }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "dog-patch",
+    "title": "Dog patch",
+    "price": 700,
+    "kind": "accessories",
+    "description": "Woven, 3\" across, iron-on backing. Sand with the dog in black.",
+    "images": [
+      "images/dog-patch.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "3 inch",
+        "available": true
+      }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "sticker-pack",
+    "title": "Sticker pack",
+    "price": 800,
+    "kind": "accessories",
+    "description": "Six vinyl stickers for the price of four: the dog, the van, the lighthouse, the wordmark, and two we're not telling you about. Weatherproof, so the one on the van has been there two winters.",
+    "images": [
+      "images/sticker-pack.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "Six stickers",
+        "available": true
+      }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "keychain-opener",
+    "title": "Keychain bottle opener",
+    "price": 1000,
+    "kind": "accessories",
+    "description": "Black steel, the dog etched on one side, opens a bottle on the other. Fits in the coin pocket.",
+    "images": [
+      "images/keychain-opener.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "One",
+        "available": true
+      }
+    ],
+    "published": "2026-09-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "canvas-tote",
+    "title": "Canvas tote",
+    "price": 1800,
+    "kind": "unusual",
+    "description": "12 oz natural cotton canvas, 15\" × 16\" with a 4\" gusset, long enough handles for a shoulder. Carries two records and a six-pack; we tested.",
+    "images": [
+      "images/canvas-tote.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "One size",
+        "available": true
+      }
+    ],
+    "published": "2026-08-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "felt-pennant",
+    "title": "Felt pennant",
+    "price": 2900,
+    "kind": "unusual",
+    "description": "9\" × 27\" sea-glass green wool felt, NORTHERN DOGS · QUEENS NY printed in black, made by Oxford Pennant in Buffalo. For the wall above the turntable.",
+    "images": [
+      "images/felt-pennant.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "9 × 27",
+        "available": true
+      }
+    ],
+    "published": "2026-09-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "queens-tea-towel",
+    "title": "Queens tea towel",
+    "price": 1500,
+    "kind": "unusual",
+    "description": "A hand-drawn map of our bit of Queens on a 22\" × 17\" flour-sack cotton towel: the practice space, the ferry, the three bars, the dog park. Dries dishes.",
+    "images": [
+      "images/queens-tea-towel.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "22 × 17",
+        "available": true
+      }
+    ],
+    "published": "2026-09-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-incense",
+    "title": "Harbor incense and holder",
+    "price": 1600,
+    "kind": "unusual",
+    "description": "Twenty sticks of cedar-and-salt incense made for us by a shop in Hudson, with a sand-coloured ceramic holder. The practice space smells like this now.",
+    "images": [
+      "images/harbor-incense.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "20 sticks + holder",
+        "available": true
+      }
+    ],
+    "published": "2026-10-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "pair-of-dice",
+    "title": "Pair of dice",
+    "price": 1200,
+    "kind": "unusual",
+    "description": "One cream, one black, 19 mm, the dog where the one should be. For the long drives. Named after the song; the song is named after the drives.",
+    "images": [
+      "images/pair-of-dice.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "A pair",
+        "available": true
+      }
+    ],
+    "published": "2026-07-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-lights-slipmat",
+    "title": "Harbor Lights slipmat",
+    "price": 2000,
+    "kind": "unusual",
+    "description": "12\" felt slipmat, night blue, the lighthouse in the middle so it sweeps the room when the record spins.",
+    "images": [
+      "images/harbor-lights-slipmat.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "12 inch",
+        "available": true
+      }
+    ],
+    "published": "2026-09-20T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "can-cooler",
+    "title": "Fall tour can cooler",
+    "price": 500,
+    "kind": "unusual",
+    "description": "Mustard neoprene, holds a 12 oz can, the van on one side. Five dollars; take two.",
+    "images": [
+      "images/can-cooler.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "12 oz",
+        "available": true
+      }
+    ],
+    "published": "2026-09-28T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "lyric-zine",
+    "title": "Lyrics & Photos 2019–2026 (zine)",
+    "price": 1400,
+    "kind": "unusual",
+    "description": "64 pages, saddle-stitched, every lyric from both records and the single, with photos from the van's glovebox. Printed in Queens in an edition of 300.",
+    "images": [
+      "images/lyric-zine.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "Edition of 300",
+        "available": true,
+        "stock": 300
+      }
+    ],
+    "published": "2026-10-01T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-mug",
+    "title": "Harbor mug",
+    "price": 1600,
+    "kind": "unusual",
+    "description": "11 oz stoneware, the dog on one side, your coffee on the inside. Dishwasher fine.",
+    "images": [
+      "images/harbor-mug.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "11 oz",
+        "available": true
+      }
+    ],
+    "published": "2026-06-15T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "dog-bandana",
+    "title": "Dog bandana",
+    "price": 1800,
+    "kind": "dog",
+    "description": "For the actual dog. Red cotton, the dog on the dog, ties at the neck. Three sizes; measure the neck and add a hand.",
+    "images": [
+      "images/dog-bandana.svg"
+    ],
+    "variants": [
+      {
+        "id": "s-up-to-14-",
+        "title": "S (up to 14\")",
+        "available": true
+      },
+      {
+        "id": "m-14-20-",
+        "title": "M (14–20\")",
+        "available": true
+      },
+      {
+        "id": "l-20-",
+        "title": "L (20\"+)",
+        "available": true
+      }
+    ],
+    "published": "2026-09-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "walks-leash",
+    "title": "Walks leash",
+    "price": 3400,
+    "kind": "dog",
+    "description": "6 ft mustard climbing rope, brass clip, a leather tab stamped WALKS. Made by a rope shop in Vermont. Holds a 90 lb dog; we have one.",
+    "images": [
+      "images/walks-leash.svg"
+    ],
+    "variants": [
+      {
+        "id": "one",
+        "title": "6 ft",
+        "available": true
+      }
+    ],
+    "published": "2026-09-10T12:00:00Z"
+  },
+  {
+    "sample": true,
+    "id": "harbor-lights-bundle",
+    "title": "Harbor Lights bundle: LP + tee",
+    "price": 5800,
+    "kind": "music",
+    "description": "The record in the colour you pick and the dog tee in your size, for $5 less than apart. Ships together when the record does.",
+    "images": [
+      "images/harbor-lights-bundle.svg"
+    ],
+    "variants": [
+      {
+        "id": "green-s",
+        "title": "Green LP + tee S",
+        "available": true
+      },
+      {
+        "id": "green-m",
+        "title": "Green LP + tee M",
+        "available": true
+      },
+      {
+        "id": "green-l",
+        "title": "Green LP + tee L",
+        "available": true
+      },
+      {
+        "id": "green-xl",
+        "title": "Green LP + tee XL",
+        "available": true
+      },
+      {
+        "id": "green-2xl",
+        "title": "Green LP + tee 2XL",
+        "available": true
+      },
+      {
+        "id": "black-s",
+        "title": "Black LP + tee S",
+        "available": true
+      },
+      {
+        "id": "black-m",
+        "title": "Black LP + tee M",
+        "available": true
+      },
+      {
+        "id": "black-l",
+        "title": "Black LP + tee L",
+        "available": true
+      },
+      {
+        "id": "black-xl",
+        "title": "Black LP + tee XL",
+        "available": true
+      },
+      {
+        "id": "black-2xl",
+        "title": "Black LP + tee 2XL",
+        "available": true
+      }
+    ],
+    "bundle": [
+      {
+        "product": "harbor-lights-lp",
+        "variant": "green"
+      },
+      {
+        "product": "dog-logo-tee",
+        "variant": "*"
+      }
+    ],
+    "ship_date": "2026-11-13",
+    "published": "2026-09-20T12:00:00Z"
   }
 ]

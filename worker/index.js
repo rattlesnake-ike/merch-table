@@ -8,7 +8,7 @@ import { handleAdmin, currentAdmin, timingSafeEqual } from "./admin.js";
 import { recordOrder, ordersForEmail, orderRows } from "./orders.js";
 import { paymentUri, qrSvg, COINS } from "./coins.js";
 import { isTicket, ticketsForOrder, ticketHtml, usedAt, showOver, showOff } from "./tickets.js";
-import { liveProducts, liveStore, siteOf, serveImage, webhookSecret, sessionSecret, builtProducts, freshHint, withStripeKey } from "./live.js";
+import { liveProducts, liveStore, siteOf, serveImage, webhookSecret, sessionSecret, builtProducts, freshHint, withStripeKey, soldKey, soldCount, getLogo } from "./live.js";
 import { stripe, keyProblem, form, StripeError } from "./stripe.js";
 import { setupChecks } from "./setup.js";
 export { stripe, keyProblem, form, StripeError };
@@ -28,6 +28,7 @@ export default {
       // A product or section address without its slash gets one, so old links and typed ones both land.
       if (/^\/(products\/[^/]+|cart|thanks|shipping)$/.test(url.pathname)) return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
       if (url.pathname.startsWith("/img/")) return (await serveImage(env, url)) ?? bad("Not found", 404);
+      if (url.pathname === "/favicon.svg" || url.pathname === "/logo") { const l = await getLogo(env); if (l) return new Response(l.bytes, { headers: { "content-type": l.type, "cache-control": "public, max-age=3600" } }); }
       // Deliberately says nothing about the band's Stripe account: this is world-readable.
       if (url.pathname === "/api/health") return json({ ok: true, products: builtProducts.filter((p) => !p.hidden).length });
       if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
@@ -216,9 +217,6 @@ async function coinRate(coin, currency) {
   } catch { return null; }
 }
 
-/* ---------- Stock (optional KV). sold:<product>:<variant> = number sold so far. ---------- */
-const soldKey = (p, v) => `sold:${p}:${v}`;
-async function soldCount(env, p, v) { if (!env.STOCK) return 0; return Number((await env.STOCK.get(soldKey(p, v))) ?? 0); }
 
 /* ---------- POST /api/checkout ---------- */
 async function checkout(req, env, url, store, products) {

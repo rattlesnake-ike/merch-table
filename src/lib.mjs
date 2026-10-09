@@ -31,6 +31,9 @@ export const regionFor = (store, country) => store.shipping.find((r) => r.countr
 /** Every country the store ships to. */
 export const allCountries = (store) => [...new Set(store.shipping.flatMap((r) => r.countries))];
 
+/** A store's own section kinds, folded to the six kinds fan tools read. */
+export const MERCH_KINDS = { hats: "apparel", shirts: "apparel", tickets: "other", shows: "other", dog: "unusual", home: "unusual", bits: "accessories", posters: "prints" };
+
 /** The merch.json feed: a plain description of the table any reader can use. */
 export function merchJson(store, products, siteUrl, now = new Date()) {
   return {
@@ -42,7 +45,7 @@ export function merchJson(store, products, siteUrl, now = new Date()) {
       url: `${siteUrl}/products/${p.id}/`,
       price: (p.price / 100).toFixed(2),
       currency: store.currency.toUpperCase(),
-      kind: p.kind ?? "other",
+      kind: MERCH_KINDS[p.kind] ?? (["music", "apparel", "prints", "accessories", "unusual", "other"].includes(p.kind) ? p.kind : "other"),
       available: p.variants.some((v) => variantAvailable(v)),
       variants: p.variants.map((v) => ({ id: v.id, title: v.title, available: variantAvailable(v), ...(v.price != null ? { price: (v.price / 100).toFixed(2) } : {}) })),
       image: p.images?.[0] ? `${siteUrl}/${p.images[0]}` : undefined,
@@ -67,6 +70,8 @@ export function validate(store, products) {
   }
   const seenCountry = new Set();
   for (const r of store?.shipping ?? []) for (const c of r.countries ?? []) { need(!seenCountry.has(c), `store.json: country ${c} is in two shipping regions`); seenCountry.add(c); }
+  for (const sec of store?.sections ?? []) need(sec && typeof sec.kind === "string" && /^[a-z0-9-]{1,30}$/.test(sec.kind) && typeof sec.title === "string" && sec.title, "store.json: each section needs a kind (lowercase, like apparel) and a title");
+  for (const l of store?.links ?? []) need(l && typeof l.label === "string" && l.label && typeof l.url === "string" && /^(https?:\/\/|\/)/.test(l.url), "store.json: each header link needs a label and a url");
   need(Array.isArray(products), "products.json must be a list");
   const ids = new Set();
   for (const p of products ?? []) {
@@ -87,6 +92,7 @@ export function validate(store, products) {
     if (p.ship_date) need(/^\d{4}-\d{2}-\d{2}$/.test(p.ship_date), `product ${p.id}: ship_date must look like 2026-11-13`);
     if (p.live_at) need(!Number.isNaN(new Date(p.live_at).getTime()), `product ${p.id}: live_at must be a date and time, like 2026-11-13T20:00:00-05:00`);
     if (p.compare_at != null) need(Number.isInteger(p.compare_at) && p.compare_at > p.price, `product ${p.id}: compare_at must be higher than price`);
+    if (p.show) { need(/^\d{4}-\d{2}-\d{2}$/.test(p.show.date ?? ""), `product ${p.id}: show.date must look like 2026-11-13`); if (p.show.time) need(/^\d{2}:\d{2}$/.test(p.show.time), `product ${p.id}: show.time must look like 20:00`); }
     if (p.bundle) for (const b of p.bundle) need(products.some((q) => q.id === b.product), `product ${p.id}: bundle part ${b.product} is not a product`);
   }
   return errs;

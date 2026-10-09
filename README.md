@@ -4,7 +4,7 @@ Your band's own merch store, on your own domain, run from your phone. A cart, Ap
 
 **What it does:** product pages with sizes, sold-out sizes struck through, a cart, Apple Pay / Google Pay / Link / cards at checkout, discount codes, shipping by region with free-over thresholds, receipts, pre-orders (a ship date on the page, in the cart and on the receipt), drops that go on sale at a set time by themselves, bundles, back-in-stock requests, live stock counting, an order list with tracking and a dispute pack, tickets to your own shows with a door check-in, old Shopify URLs redirected, a sitemap, an RSS feed, `merch.json` for fan tools, and schema.org data for search engines.
 
-**How you run it:** an admin on your phone. Add a product with a photo from your camera roll, change a price, mark a size sold out, put the tracking number on an order. Everything else is still a file in this folder if you ever want it to be.
+**How you run it:** an admin on your phone. Add a product with a photo from your camera roll, change a price, count stock, put a show on sale, pack and refund orders, change the shipping prices and the colours. The files in this folder are the baseline and the backup; a coding agent can change anything the admin doesn't reach.
 
 **What it costs:** Stripe's card fee (2.9% + 30¢ on US cards) and your domain. Hosting is free on Cloudflare's plan for the traffic a band store gets, and the free plan allows commercial use.
 
@@ -56,9 +56,15 @@ Buy it at [Cloudflare](https://www.cloudflare.com/products/registrar/), [Porkbun
 
 ## Day to day: the admin
 
-Most days you don't touch a file. Go to **`your-store-address/admin`**, sign in with the admin password (you stay signed in on that phone for a month), tap a product, change it, save. It's live straight away.
+Most days you don't touch a file. Go to **`your-store-address/admin`** (or tap **Run this store** at the bottom of any page), sign in with the admin password (you stay signed in on that phone for a month), and the home screen shows what needs you: orders to pack, money this month, sizes running low or sold out, what changed last. Add it to your phone's home screen and it opens like an app, in your store's colour.
 
-**What the admin does:** Setup (the Stripe key, the contact address, the sample products, and a check of everything that has to be right); add a product with photos, change a price, rename it, edit its description, add sizes, mark any size sold out or back in, set or clear a pre-order ship date, move it to another section, hide it or remove it; change the store's name, contact address, colours and type; import a Shopify export; see orders and put tracking numbers on them; a dispute pack per order; the door for tickets; refunds for a cancelled show.
+- **Products:** add one with photos from your camera roll (shrunk in the browser before they upload), a price, a was-price for sales, the sizes, how many of each are left, a pre-order ship date, a drop time after which the page opens itself. Search, filter by section, move products up and down, duplicate one, remove one. **Import from Shopify** reads the CSV export. **Who wants a restock** lists the fans who asked.
+- **Orders:** to pack, shipped, all; search by name, email, item or tracking. Each order has a packing slip that prints on one sheet, a box for the tracking number, a dispute pack with every field a bank asks for, and a refund button. The whole list downloads as CSV.
+- **Shows:** add a show from your phone (room, date, price, how many the venue lets you sell, what the room holds) and tickets go on sale; see how it's selling; move it or call it off, and refund everyone who bought a ticket with one press. **Door** is the check-in screen, built for one hand in bad light.
+- **Store:** the band's name, contact email, logo, colours and type; shipping regions and prices; the sections on the front page; the links in the header; the mailing-list form; what shows on the card statement; your returns line; Stripe Tax.
+- **Setup:** is the store ready to take money, with the fix in each row and a direct link to the exact Stripe or Cloudflare screen.
+
+Everything the admin saves is live for you at once and for everyone else within a minute.
 
 **Signing in by email** instead of the password is optional: add a [Resend](https://resend.com) API key as `RESEND_API_KEY` and `MAIL_FROM` at your domain, and the owners listed in `OWNER_EMAIL` (several addresses, comma-separated) get a one-time link.
 
@@ -113,13 +119,11 @@ Everything the admin edits lives in Cloudflare's storage on top of two files in 
 
 | To… | Do this |
 |---|---|
-| Add a product, change a price, mark a size sold out, swap a photo | The admin. |
-| Run a pre-order | The admin's ship date, or `"ship_date": "2026-11-13"`. |
-| Run a drop | `"live_at": "2026-11-13T20:00:00-05:00"`. The page shows the date and time and opens itself at that moment. Nobody can check out before it. |
+| Add a product, change a price, count stock, swap a photo, a sale price, a pre-order, a drop | The admin. (`"ship_date"`, `"live_at"` and `"compare_at"` in the file do the same.) |
+| Shipping regions, sections, header links, the mailing list, the logo | The admin's Store screen. |
+| Sell tickets to a show, move it, call it off, refund it | The admin's Shows screen. |
 | Sell a bundle | `"bundle": [{"product":"lp","variant":"green"},{"product":"tee","variant":"*"}]`. `*` means the fan's chosen variant. When it sells, the parts' stock counts move. |
 | Sale price | `"compare_at": 5300` (the old price, struck through). |
-| Shipping prices and regions | `store.json` → `shipping`. Each region has countries, `amount` (cents), optional `free_over`, and an `estimate` line fans see. |
-| Sections on the front page | `store.json` → `sections`. |
 | Old Shopify URLs | Product handles already match. For anything else, add lines to `redirects.txt`: `/pages/about /shipping/`. |
 | Who wants a restock | `https://shop.yourband.com/api/wants?key=YOUR_ADMIN_KEY` downloads a CSV. Email them yourself from your mailing tool. |
 | Mailing list | `store.json` → `mailing_list.action`: the form URL from Buttondown, Mailchimp or your own tool. The sign-up appears in the footer. |
@@ -133,7 +137,7 @@ Working on the files on a laptop: `npm install`, `npm run check` (says exactly w
 ```
 store.json        the band, shipping, colours, links (the admin's Store screen edits the first few)
 products.json     the catalogue (the admin adds to it and edits it)
-images/           product images in the repo (photos added in the admin live in storage)
+images/           the sample band's drawings (scripts/sample-art.mjs redraws them); photos added in the admin live in storage
 brand/            favicon.svg, artwork for whoever designs
 public/           anything copied as-is: fonts, extra pages
 redirects.txt     old-path new-path, one per line
@@ -144,7 +148,7 @@ src/site.js       cart, size picker, drops, stock, checkout hand-off
 src/lib.mjs       validation, money, the look, shared by build and Worker
 src/shopify.mjs   the Shopify CSV reader, shared by `npm run import` and the admin
 worker/index.js   the server: pages, /api/checkout, /api/session, /api/stock, /api/restock, /api/webhook, /api/wants
-worker/admin.js   the band's admin: sign-in, products, store settings, setup, import, orders, door
+worker/admin.js   the band's admin: sign-in and the switchboard; the screens are in worker/admin/ (home, products, orders, store, shows + door, setup, ui)
 worker/live.js    what's on sale right now: files + the band's edits; secrets derived or kept
 worker/setup.js   the readiness checks, and connecting orders to Stripe
 worker/stripe.js  Stripe by plain HTTPS
@@ -165,7 +169,7 @@ scripts/          import-shopify.mjs, check.mjs
 
 ## Limits, honestly
 
-- The admin edits products and the store's basics. Shipping prices, sections, bundles, drops and the design are still a file and a push (or a coding agent, see `AGENTS.md`).
+- The admin edits products, shows, orders and the store's settings. Bundles, the currency and the design itself are still a file and a push (or a coding agent, see `AGENTS.md`).
 - Up to 10 of one item per order and 50 lines per cart; Stripe allows 100.
 - Shipping is a flat rate per region. Weight-based rates would need code.
 - Stripe Tax (0.5% per transaction) does the tax maths if you turn `tax.automatic` on and have registered in Stripe; filing is still yours.

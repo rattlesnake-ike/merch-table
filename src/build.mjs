@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, copyFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
+import { deflateSync } from "node:zlib";
 import { validate, merchJson, lookCss, FONTS } from "./lib.mjs";
 import { indexPage, productPage, cartPage, thanksPage, shippingPage, notFoundPage, rss, sitemap } from "./templates.mjs";
 
@@ -75,6 +76,19 @@ write("site.css", head + readFileSync(join(root, "src/site.css"), "utf8") + tail
 // The values site.js needs (currency, shipping table, which products are tickets) are written
 // into every page by the templates, so the script itself is served as-is.
 write("site.js", readFileSync(join(root, "src/site.js"), "utf8"));
+
+// The admin's home-screen icon: iOS wants a real PNG, so write a plain square in the accent colour.
+write("admin-icon.png", solidPng(192, store.colors?.accent ?? "#2743d0"));
+function solidPng(size, hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) || 0);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(size * 3, Buffer.from([r, g, b]))]);
+  const raw = Buffer.concat(Array.from({ length: size }, () => row));
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf) => { let c = 0xffffffff; for (const x of buf) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([len, td, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
 
 // Anything in ./public is copied as-is (fonts, extra pages, a logo).
 const pub = join(root, "public");
