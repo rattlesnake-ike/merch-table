@@ -1,6 +1,6 @@
 {
   "name": "merch-table",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A band's own merch store: static pages on your own domain, a cart, Stripe Checkout, free hosting. No platform, no rent, no tracking.",
   "type": "module",
   "private": true,
@@ -10,10 +10,29 @@
     "dev": "node src/build.mjs && wrangler dev",
     "deploy": "node src/build.mjs && wrangler deploy",
     "import": "node scripts/import-shopify.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "deploy:demo": "node src/build.mjs && wrangler deploy --env demo"
   },
   "devDependencies": {
     "wrangler": "^4.41.0"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "cloudflare": {
+    "bindings": {
+      "STRIPE_SECRET_KEY": {
+        "description": "Your Stripe **Secret key**: Stripe → Developers → API keys → Secret key → **Reveal**. It starts with `sk_test_`. Not the Publishable key (`pk_…`), which is the one Stripe shows first."
+      },
+      "ADMIN_KEY": {
+        "description": "A password for your store's admin. Make up something long. You type it once per phone or laptop to sign in at `/admin`."
+      },
+      "OWNER_EMAIL": {
+        "description": "Your email. It becomes the store's contact address (you can change it in the admin) and lets you sign in by email later."
+      },
+      "STOCK": {
+        "description": "Where your edits, orders and stock counts are kept. Created for you; nothing to do."
+      }
+    }
+  }
 }

@@ -6,9 +6,10 @@ below is a way to make it look like your band and nobody else's.
 
 Three levels, in order of effort.
 
-## 1. Settings (ten minutes, no code)
+## 1. Settings (two minutes, no code)
 
-`store.json`:
+In the admin, **Store**: the three colours, the type, the corners and the heading case, saved from
+your phone. The same settings live in `store.json` if you'd rather edit the file:
 
 ```json
 "colors": { "ink": "#2b1a12", "paper": "#fbf6ee", "accent": "#a63d2f" },

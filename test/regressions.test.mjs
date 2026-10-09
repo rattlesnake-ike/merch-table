@@ -127,8 +127,11 @@ test("the class names the script depends on are documented in the file that depe
   for (const hook of [".sz", ".buy", ".soldout", "data-variant", "data-cart-rows"]) assert.ok(header.includes(hook), `${hook} must be listed as a hook a restyle has to keep`);
 });
 
+const libMjs = readFileSync(new URL("../src/lib.mjs", import.meta.url), "utf8");
 test("a band restyling properly can switch off the rules the build appends", () => {
-  assert.match(buildMjs, /if \(!look\.raw\) css \+=/, "look.raw must skip the appended heading and corner rules");
+  // The rules live in lookCss() now, shared by the build and the Worker, so one switch covers both.
+  assert.match(libMjs, /if \(!look\.raw\) tail \+=/, "look.raw must skip the appended heading and corner rules");
+  assert.match(buildMjs, /lookCss\(store/, "the build must use the shared rules");
 });
 
 test("a missing font file is reported, never silently ignored", () => {
@@ -372,8 +375,11 @@ test("a cart saved before tickets existed still isn't charged postage", () => {
   assert.match(site, /window\.__tickets \|\| \[\]/, "the cart must read the live ticket list");
   assert.match(site, /i\.ticket === true/, "the saved flag stays as a fallback, not the source of truth");
 
-  const build = readFileSync(new URL("../src/build.mjs", import.meta.url), "utf8");
-  assert.match(build, /window\.__tickets=/, "the build must publish which products are tickets");
+  // The list is written into every page by the templates (so a ticket added in the admin counts
+  // too), not baked into site.js at build time.
+  const lib = readFileSync(new URL("../src/lib.mjs", import.meta.url), "utf8");
+  assert.match(lib, /window\.__tickets=/, "every page must publish which products are tickets");
+  assert.match(readFileSync(new URL("../src/templates.mjs", import.meta.url), "utf8"), /pageConfig\(store, products\)/, "the shell must write it");
 });
 
 test("a cart row keeps its shape when an item has a pre-order date", () => {
@@ -406,8 +412,10 @@ test("a missing session secret doesn't take the page down with it", async () => 
 
 test("every admin form guards its csrf call for demo mode", () => {
   const src = readFileSync(new URL("../worker/admin.js", import.meta.url), "utf8");
-  const calls = [...src.matchAll(/csrfToken\(env\.SESSION_SECRET, me\)/g)];
-  assert.ok(calls.length >= 5, "expected several csrf call sites");
+  // Every screen computes the token once, guarded, and reuses it: `tok` is only ever built as
+  // `demo ? "" : await csrfToken(sec, me)`, so one guarded line covers every form.
+  const calls = [...src.matchAll(/csrfToken\((?:env\.SESSION_SECRET|sec), me\)/g)];
+  assert.ok(calls.length >= 1, "expected the csrf call site");
   for (const m of calls) {
     const line = src.slice(src.lastIndexOf("\n", m.index) + 1, src.indexOf("\n", m.index));
     assert.match(line, /demo/, `unguarded csrf call would 500 a demo:\n  ${line.trim().slice(0, 100)}`);
@@ -427,6 +435,6 @@ test("a demo in test mode says so, rather than looking like a real shop", () => 
   assert.match(tpl, /store\.demo_banner \?/, "the banner is opt-in: a real store sets nothing and shows nothing");
 
   // And a real store with a broken key still gets the specific, actionable message.
-  const src = readFileSync(new URL("../worker/index.js", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../worker/stripe.js", import.meta.url), "utf8");
   assert.match(src, /Checkout isn't connected yet: \$\{problem\}/);
 });

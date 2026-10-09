@@ -1,63 +1,74 @@
 // The only server code in the store. Runs on Cloudflare Workers, in front of the static files.
-// Routes: POST /api/checkout · GET /api/session · GET /api/stock · POST /api/restock · POST /api/webhook · GET /api/wants
-import store from "../store.json" with { type: "json" };
-import products from "../products.json" with { type: "json" };
-import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, validate } from "../src/lib.mjs";
-import { handleAdmin, currentAdmin } from "./admin.js";
-import { recordOrder, ordersForEmail, orderRows, getOrder, listOrders } from "./orders.js";
+// It renders every page from store.json + products.json + the band's live edits, and answers:
+// POST /api/checkout · GET /api/session · GET /api/stock · POST /api/restock · POST /api/webhook · GET /api/wants · /api/setup
+// plus /admin (the band), /orders (a buyer's lookup), /tickets (a fan's tickets) and /img (uploaded pictures).
+import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, merchJson, lookCss } from "../src/lib.mjs";
+import { indexPage, productPage, cartPage, thanksPage, shippingPage, notFoundPage, rss, sitemap } from "../src/templates.mjs";
+import { handleAdmin, currentAdmin, timingSafeEqual } from "./admin.js";
+import { recordOrder, ordersForEmail, orderRows } from "./orders.js";
 import { paymentUri, qrSvg, COINS } from "./coins.js";
-import { isTicket, ticketProducts, ticketsForOrder, ticketHtml, usedAt, showOver, ticketsLeft, showOff } from "./tickets.js";
+import { isTicket, ticketsForOrder, ticketHtml, usedAt, showOver, showOff } from "./tickets.js";
+import { liveProducts, liveStore, siteOf, serveImage, webhookSecret, sessionSecret, builtProducts, freshHint } from "./live.js";
+import { stripe, keyProblem, form, StripeError } from "./stripe.js";
+import { setupChecks } from "./setup.js";
+export { stripe, keyProblem, form, StripeError };
 
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, status);
-
-/** The catalogue the store is actually selling: the band's live edits if any, else the built file. */
-async function liveProducts(env) {
-  if (!env.STOCK) return products;
-  try {
-    const raw = await env.STOCK.get("catalogue");
-    if (!raw) return products;
-    const edited = JSON.parse(raw);
-    return Array.isArray(edited) && edited.length ? edited : products;
-  } catch { return products; }
-}
+const html = (body, status = 200, headers = {}) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...headers } });
 
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     try {
-      if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
-        const live = await liveProducts(env);
-        const save = async (next, who, what) => {
-          const errs = validate(store, next);
-          if (errs.length) return { ok: false, error: errs[0] };
-          if (!env.STOCK) return { ok: false, error: "This store has no storage for live edits yet. Create a KV namespace called STOCK (the README says how), or edit products.json and push." };
-          await env.STOCK.put("catalogue", JSON.stringify(next));
-          const log = JSON.parse((await env.STOCK.get("editlog")) ?? "[]");
-          log.unshift({ at: new Date().toISOString(), who, what });
-          await env.STOCK.put("editlog", JSON.stringify(log.slice(0, 200)));
-          return { ok: true };
-        };
-        return await handleAdmin(req, env, url, store, live, save, null);
+      // A product or section address without its slash gets one, so old links and typed ones both land.
+      if (/^\/(products\/[^/]+|cart|thanks|shipping)$/.test(url.pathname)) return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
+      if (url.pathname.startsWith("/img/")) return (await serveImage(env, url)) ?? bad("Not found", 404);
+      // Deliberately says nothing about the band's Stripe account: this is world-readable.
+      if (url.pathname === "/api/health") return json({ ok: true, products: builtProducts.filter((p) => !p.hidden).length });
+      if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
+
+      // The browser that just saved something carries the version it wrote, so it reads its own change.
+      const hint = freshHint(req);
+      const store = await liveStore(env, hint);
+      const products = await liveProducts(env, hint);
+      store.siteUrl = siteOf(env, url);
+
+      if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return await handleAdmin(req, env, url, store, products, hint);
+
+      // The pages, rendered from what is on sale right now.
+      if (url.pathname === "/") return html(indexPage(store, products));
+      const onProduct = url.pathname.match(/^\/products\/([^/]+)\/$/);
+      if (onProduct) {
+        const p = products.find((x) => x.id === decodeURIComponent(onProduct[1]));
+        return p ? html(productPage(store, p, products)) : html(notFoundPage(store, products), 404);
       }
-      // A page the band has edited is patched on the way out, so a save shows at once.
-      if (env.STOCK && (url.pathname === "/" || /^\/products\/[^/]+\/?$/.test(url.pathname))) return await patchPage(req, env, url, await liveProducts(env));
-      if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, await liveProducts(env));
+      if (url.pathname === "/cart/") return html(cartPage(store, products));
+      if (url.pathname === "/thanks/") return html(thanksPage(store, products));
+      if (url.pathname === "/shipping/") return html(shippingPage(store, products));
+      if (url.pathname === "/site.css") return await styles(req, env, store);
+      if (url.pathname === "/merch.json") return new Response(JSON.stringify(merchJson(store, products, store.siteUrl), null, 1), { headers: { "content-type": "application/json", "cache-control": "public, max-age=600" } });
+      if (url.pathname === "/feed.xml") return new Response(rss(store, products), { headers: { "content-type": "application/rss+xml; charset=utf-8", "cache-control": "public, max-age=600" } });
+      if (url.pathname === "/sitemap.xml") return new Response(sitemap(store, products), { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=3600" } });
+      if (url.pathname === "/robots.txt") return new Response(`User-agent: *\nAllow: /\nDisallow: /cart/\nDisallow: /thanks/\nDisallow: /admin\nSitemap: ${store.siteUrl}/sitemap.xml\n`, { headers: { "content-type": "text/plain", "cache-control": "public, max-age=3600" } });
+
+      if (url.pathname === "/api/checkout" && req.method === "POST") return await checkout(req, env, url, store, products);
       // Paying the band directly, no processor. Only exists if the band put an address in
       // store.json; otherwise the route is simply not there.
-      if (url.pathname === "/api/coin" && req.method === "POST") return await coinRequest(req, env, url, await liveProducts(env));
-      if (url.pathname === "/orders" || url.pathname === "/orders/") return await lookup(req, env, url);
-      if (url.pathname.startsWith("/tickets")) return await ticketsPage(req, env, url);
-      if (url.pathname === "/api/catalogue") return json({ products: (await liveProducts(env)).filter((p) => !p.hidden && isLive(p)) });
+      if (url.pathname === "/api/coin" && req.method === "POST") return await coinRequest(req, env, url, store, products);
+      if (url.pathname === "/orders" || url.pathname === "/orders/") return await lookup(req, env, url, store);
+      if (url.pathname.startsWith("/tickets")) return await ticketsPage(req, env, url, store, products);
+      if (url.pathname === "/api/catalogue") return json({ products: products.filter((p) => !p.hidden && isLive(p)) });
       if (url.pathname === "/api/session" && req.method === "GET") return await session(env, url);
-      if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url, await liveProducts(env));
-      if (url.pathname === "/api/restock" && req.method === "POST") return await restock(req, env, await liveProducts(env));
-      if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
+      if (url.pathname === "/api/stock" && req.method === "GET") return await stock(env, url, products);
+      if (url.pathname === "/api/restock" && req.method === "POST") return await restock(req, env, products);
       if (url.pathname === "/api/wants" && req.method === "GET") return await wants(env, url);
       if (url.pathname === "/api/setup") return await setup(req, env, url, store);
-      // Deliberately says nothing about the band's Stripe account: this is world-readable.
-      if (url.pathname === "/api/health") return json({ ok: true, products: products.filter((p) => !p.hidden).length });
-      return bad("Not found", 404);
+      if (url.pathname.startsWith("/api/")) return bad("Not found", 404);
+      // Everything else is a static file: images, the script, fonts, anything in ./public.
+      const asset = await env.ASSETS.fetch(req);
+      if (asset.status === 404 && (asset.headers.get("content-type") ?? "").includes("text/html")) return html(notFoundPage(store, products), 404);
+      return asset;
     } catch (e) {
       if (e instanceof StripeError) return bad(e.message, e.status);
       console.error(e);
@@ -66,70 +77,19 @@ export default {
   },
 };
 
-/* ---------- Serve a built page with the band's live edits patched in ---------- */
-async function patchPage(req, env, url, live) {
-  const res = await env.ASSETS.fetch(req);
-  if (!res.ok || !(res.headers.get("content-type") ?? "").includes("text/html")) return res;
-  let html = await res.text();
-  const fmt = (c) => new Intl.NumberFormat(store.locale ?? "en-US", { style: "currency", currency: store.currency.toUpperCase(), minimumFractionDigits: c % 100 === 0 ? 0 : 2 }).format(c / 100);
-  const onProduct = url.pathname.match(/^\/products\/([^/]+)\/?$/);
-
-  if (onProduct) {
-    const id = decodeURIComponent(onProduct[1]);
-    const p = live.find((x) => x.id === id); const built = products.find((x) => x.id === id);
-    if (p && built) {
-      if (p.title !== built.title) html = html.split(escapeHtmlLite(built.title)).join(escapeHtmlLite(p.title));
-      if (p.price !== built.price) {
-        html = html.split(`data-price="${built.price}"`).join(`data-price="${p.price}"`);
-        html = html.split(`<span data-price-display>${fmt(built.price)}</span>`).join(`<span data-price-display>${fmt(p.price)}</span>`);
-        for (const v of built.variants) { const bp = v.price ?? built.price, np = (p.variants.find((x) => x.id === v.id) ?? {}).price ?? p.price; if (bp !== np) html = html.split(`data-variant="${v.id}" data-price="${bp}"`).join(`data-variant="${v.id}" data-price="${np}"`); }
-      }
-      if ((p.description ?? "") !== (built.description ?? "") && built.description) {
-        const rebuilt = (p.description ?? "").split(/\n\n+/).map((x) => `<p>${escapeHtmlLite(x).replace(/\n/g, "<br>")}</p>`).join("");
-        const oldBlock = built.description.split(/\n\n+/).map((x) => `<p>${escapeHtmlLite(x).replace(/\n/g, "<br>")}</p>`).join("");
-        html = html.split(oldBlock).join(rebuilt);
-      }
-    }
-  } else {
-    // Front page: rebuild each card's price line from the live data, and drop a hidden card.
-    const cardPrice = (p) => {
-      const lows = p.variants.map((v) => v.price ?? p.price);
-      const lo = Math.min(...lows), hi = Math.max(...lows);
-      return lo === hi ? fmt(lo) : `from ${fmt(lo)}`;
-    };
-    for (const p of live) {
-      const built = products.find((x) => x.id === p.id); if (!built) continue;
-      const before = cardPrice(built), after = cardPrice(p);
-      if (before !== after) {
-        const re = new RegExp(`(href="/products/${escapeRe(p.id)}/"[\\s\\S]{0,400}?<span class="price">)${escapeRe(before)}(</span>)`);
-        html = html.replace(re, (_m, a, b) => a + after + b);
-      }
-      if (p.title !== built.title) html = html.replace(new RegExp(`(href="/products/${escapeRe(p.id)}/"[\\s\\S]{0,300}?<span class="t">)${escapeRe(escapeHtmlLite(built.title))}(</span>)`), (_m, a, b) => a + escapeHtmlLite(p.title) + b);
-      const soldOutNow = !p.variants.some((v) => v.available !== false);
-      if (soldOutNow && built.variants.some((v) => v.available !== false)) {
-        html = html.replace(new RegExp(`<a class="card"( [^>]*)?href="/products/${escapeRe(p.id)}/"`), (_m, a) => `<a class="card sold"${a ?? " "}href="/products/${p.id}/"`);
-        html = html.replace(new RegExp(`(href="/products/${escapeRe(p.id)}/"[\\s\\S]{0,400}?<span class="price">[^<]*</span>)(</span>)`), (_m, a, b) => `${a}<span class="flag">Sold out</span>${b}`);
-      }
-      if (p.hidden && !built.hidden) html = html.replace(new RegExp(`<a class="card[^"]*"[^>]*href="/products/${escapeRe(p.id)}/"[\\s\\S]*?</a>`), "");
-    }
-  }
-
-  // The front-end already asks /api/stock for sold-out sizes; tell it the edited ones too.
-  if (onProduct) {
-    const p = live.find((x) => x.id === decodeURIComponent(onProduct[1]));
-    if (p) {
-      const gone = p.variants.filter((v) => v.available === false).map((v) => v.id);
-      html = html.replace("</head>", `<script>window.__soldOut=${JSON.stringify(gone)};window.__hidden=${p.hidden ? "true" : "false"}</script></head>`);
-    }
-  }
-  return new Response(html, { status: res.status, headers: { ...Object.fromEntries(res.headers), "cache-control": "no-store" } });
+/* ---------- /site.css : the built stylesheet with the band's live look appended ---------- */
+async function styles(req, env, store) {
+  const res = await env.ASSETS.fetch(new Request(new URL("/site.css", req.url), { method: "GET" }));
+  const base = res.ok ? await res.text() : "";
+  const { tail } = lookCss(store);
+  return new Response(base + tail, { headers: { "content-type": "text/css; charset=utf-8", "cache-control": "public, max-age=300" } });
 }
 
 /* ---------- /orders : a buyer finding their own order ----------
    Email only. It proves nothing on its own, so this shows only what a receipt would have
    shown them anyway, and never an address or a phone number. The point is that a confused
    buyer reaches the band instead of their bank. */
-async function lookup(req, env, url) {
+async function lookup(req, env, url, store) {
   const page = (body, status = 200) => new Response(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Your order · ${escapeHtmlLite(store.name)}</title><link rel="stylesheet" href="/site.css"></head><body><div class="top"><a class="wm" href="/">${escapeHtmlLite(store.name)}</a></div><main class="prose" style="padding:0 20px">${body}</main></body></html>`, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
 
   const help = `<p>Can't find it, or something's wrong with the order? Write to <a href="mailto:${escapeHtmlLite(store.email ?? "")}">${escapeHtmlLite(store.email ?? "the band")}</a> and a person will answer. Please do that before asking your bank: we can fix it, and a bank dispute takes months and costs us both.</p>`;
@@ -145,8 +105,7 @@ async function lookup(req, env, url) {
 }
 
 /* ---------- /tickets : the fan's tickets, kept on their phone ---------- */
-async function ticketsPage(req, env, url) {
-  const live = await liveProducts(env);
+async function ticketsPage(req, env, url, store, live) {
   const css = `<style>
   body{font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;margin:0;background:#141416;color:#fff;padding:18px}
   main{max-width:30rem;margin:0 auto}
@@ -182,52 +141,16 @@ async function ticketsPage(req, env, url) {
   return page(`<h1>Your ticket${out.length > 1 ? "s" : ""}</h1>${out.map(({ t, o, used }) => ticketHtml(t, o, store, used)).join("")}<p class="fine">Show the code at the door. Each one works once.</p>`);
 }
 
-/* ---------- GET /api/setup : is this store actually ready to take money? ---------- */
+/* ---------- GET /api/setup : the old address of the setup check. It lives in the admin now. ---------- */
 async function setup(req, env, url, store) {
   // The setup page names the band's Stripe account and says whether real money is switched
   // on, so it is for the band, not the public: an owner session or the admin key.
   const key = url.searchParams.get("key") ?? "";
-  const byKey = env.ADMIN_KEY && timingSafeEqual(key, env.ADMIN_KEY);
+  const byKey = !!env.ADMIN_KEY && timingSafeEqual(key, env.ADMIN_KEY);
   const bySession = env.DEMO_ADMIN === "1" || (await currentAdmin(req, env, store).catch(() => null));
-  if (!byKey && !bySession) return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><body style="font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem"><h1 style="font-size:1.4rem">This page is for whoever runs the store</h1><p>Open it while signed in at <a href="/admin">/admin</a>, or add <code>?key=</code> and your ADMIN_KEY.</p>`, { status: 401, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
-  const checks = [];
-  const add = (name, ok, detail) => checks.push({ name, ok, detail });
-  const k = env.STRIPE_SECRET_KEY;
-  const problem = keyProblem(k);
-  add("Stripe key", !problem, problem ? problem : `Looks right (${k.startsWith("sk_live_") ? "LIVE mode: real cards will be charged" : "test mode: use card 4242 4242 4242 4242"}).`);
-  if (!problem) {
-    try {
-      const acct = await stripe(env, "GET", "/account");
-      add("Stripe account", true, `Connected to ${acct.business_profile?.name || acct.email || acct.id}. Charges ${acct.charges_enabled ? "are enabled" : "are NOT enabled yet \u2014 finish activating the account in Stripe"}.`);
-      add("Payouts", !!acct.payouts_enabled, acct.payouts_enabled ? "Stripe can pay you out." : "Add your bank details in Stripe before going live.");
-    } catch (e) { add("Stripe account", false, e.message); }
-  }
-  // Not a failure: a thing worth knowing about, where the band is already looking.
-  checks.push({ name: "Stablecoin payments", ok: null, detail: "Optional. Turning this on in your Stripe Dashboard costs 1.5% against 2.9% + 30\u00a2 on cards, settles as dollars, and refunds to the buyer's wallet by itself. No change here. Expect very few people to use it \u2014 under 2% of US consumers pay with crypto at all." });
-  add("Site address", !!env.SITE_URL, env.SITE_URL ? `Fans return to ${env.SITE_URL} after paying. This must be the address they actually use.` : "SITE_URL is not set, so Stripe may send fans to the wrong place after paying.");
-  add("Stock counting", !!env.STOCK, env.STOCK ? "On: sold-out sizes update themselves as orders come in." : "Off (optional). Sizes are sold out only when you mark them so. To turn it on, create a KV namespace called STOCK.");
-  add("Order webhook", !!env.STRIPE_WEBHOOK_SECRET, env.STRIPE_WEBHOOK_SECRET ? "Set: Stripe tells the store when an order is paid." : "Not set (optional). Only needed for stock counting.");
-  add("Back-in-stock list", !!env.ADMIN_KEY, env.ADMIN_KEY ? "You can download it from /api/wants?key=\u2026" : "ADMIN_KEY is not set, so the list can't be downloaded.");
-  // Shows: the check that is about a room, not about this software. A venue's box office has to
-  // close unsold + comps + sold = the room. A ticket sold outside that count is a body with no
-  // row in it, so a band selling its own must be selling a slice the venue already subtracted.
-  const shows = products.filter((p) => p.show?.date);
-  if (shows.length) {
-    const noAlloc = shows.filter((p) => typeof (p.show.allocation ?? p.show.capacity) !== "number");
-    const noRoom = shows.filter((p) => typeof p.show.room_capacity !== "number");
-    add("Ticket allocation", !noAlloc.length, noAlloc.length
-      ? `${noAlloc.map((p) => p.show.title ?? p.title).join(", ")} has no allocation, so the store will sell without a limit. Set show.allocation to the number the venue agreed you may sell.`
-      : `Selling ${shows.map((p) => `${p.show.allocation ?? p.show.capacity} for ${p.show.title ?? p.title}`).join("; ")}. That is your slice, not the room.`);
-    add("Agreed with the venue", !noRoom.length, noRoom.length
-      ? `Ask the venue three things and write them here as show.room_capacity and show.venue_contact: what the room holds, how many of those you may sell, and how your names reach their door list. Selling outside their count is how a show gets shut down.`
-      : `Room holds ${shows.map((p) => p.show.room_capacity).join("/")}. Send your sold list to the venue before doors; the door count is theirs to defend, not yours.`);
-  }
-  const ready = checks.filter((c) => ["Stripe key", "Stripe account", "Site address"].includes(c.name)).every((c) => c.ok);
-  if (url.searchParams.get("format") === "json") return json({ ready, checks });
-  // ok === null means "worth knowing", not "wrong": a red cross against an optional thing
-  // reads as a fault the band has to fix, which is a lie.
-  const rows = checks.map((c) => `<tr><td>${c.ok === null ? "\u00b7" : c.ok ? "\u2713" : "\u2717"}</td><td><b>${c.name}</b></td><td>${c.detail}</td></tr>`).join("");
-  return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><style>body{font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#141416}h1{font-size:1.6rem}table{border-collapse:collapse;width:100%}td{padding:.6rem .5rem;border-bottom:1px solid #ddd;vertical-align:top}td:first-child{font-size:1.2rem;width:1.6rem}.r{padding:1rem;background:${ready ? "#e8f5e9" : "#fff3e0"};border:1px solid #ccc;margin:1rem 0}</style><h1>Store setup</h1><div class="r"><b>${ready ? "Ready to take orders." : "Not ready yet \u2014 see below."}</b></div><table>${rows}</table><p style="color:#666">Only whoever runs this store can open this page. It shows no customer data and no keys.</p>`, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  if (!byKey && !bySession) return new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Store setup</title><body style="font:16px/1.5 ui-sans-serif,system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem"><h1 style="font-size:1.4rem">This page is for whoever runs the store</h1><p>Sign in at <a href="/admin">/admin</a> and open Setup there, or add <code>?key=</code> and your admin password to this address.</p>`, { status: 401, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  if (url.searchParams.get("format") === "json") { const r = await setupChecks(env, url, store); return json({ ready: r.ready, checks: r.checks.map(({ name, ok, detail }) => ({ name, ok, detail })) }); }
+  return Response.redirect(`${url.origin}/admin/setup${byKey && !bySession ? `?key=${encodeURIComponent(key)}` : ""}`, 302);
 }
 
 /* ---------- Paying the band's own wallet, if they set one up ---------- */
@@ -237,7 +160,7 @@ async function setup(req, env, url, store) {
  * QR code. The band confirms the money arrived; nothing here watches a chain, and the store
  * says so to the fan rather than implying it is tracking anything.
  */
-async function coinRequest(req, env, url, products) {
+async function coinRequest(req, env, url, store, products) {
   const wallets = store.wallets ?? {};
   const body = await req.json().catch(() => null);
   const coin = String(body?.coin ?? "");
@@ -289,47 +212,12 @@ async function coinRate(coin, currency) {
   } catch { return null; }
 }
 
-/* ---------- Stripe, by plain HTTPS. No SDK to install or update. ---------- */
-export function form(obj, prefix = "", out = new URLSearchParams()) {
-  for (const [k, v] of Object.entries(obj)) {
-    if (v == null) continue;
-    const key = prefix ? `${prefix}[${k}]` : k;
-    if (Array.isArray(v)) v.forEach((x, i) => (typeof x === "object" ? form(x, `${key}[${i}]`, out) : out.append(`${key}[${i}]`, String(x))));
-    else if (typeof v === "object") form(v, key, out);
-    else out.append(key, String(v));
-  }
-  return out;
-}
-export function keyProblem(k) {
-  if (!k) return "the store has no Stripe key yet. Put your Stripe SECRET key (it starts with sk_test_ or sk_live_) in the STRIPE_SECRET_KEY setting.";
-  if (k.startsWith("pk_")) return "the PUBLISHABLE key was pasted instead of the secret one. In Stripe go to Developers \u2192 API keys, click Reveal on the Secret key, and copy the value starting sk_test_ or sk_live_ into STRIPE_SECRET_KEY.";
-  if (k.startsWith("rk_")) return "a restricted key was used. It needs permission to write Checkout Sessions, or use the full secret key (sk_test_ or sk_live_).";
-  if (k.startsWith("whsec_")) return "the webhook signing secret was pasted into STRIPE_SECRET_KEY. The secret key starts with sk_test_ or sk_live_; whsec_ belongs in STRIPE_WEBHOOK_SECRET.";
-  if (!k.startsWith("sk_")) return "that doesn't look like a Stripe secret key. It should start with sk_test_ or sk_live_.";
-  if (k.length < 40) return "the secret key looks cut short, as if the paste was incomplete. Copy the whole value from Stripe.";
-  return null;
-}
-
-export async function stripe(env, method, path, body) {
-  const problem = keyProblem(env.STRIPE_SECRET_KEY);
-  if (problem) throw new StripeError(`Checkout isn't connected yet: ${problem}`, 503);
-  const res = await fetch(`https://api.stripe.com/v1${path}`, { method, headers: { authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "content-type": "application/x-www-form-urlencoded", "stripe-version": "2025-08-27.basil" }, body: body ? form(body) : undefined });
-  const j = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    console.error("stripe", res.status, JSON.stringify(j.error ?? j));
-    if (res.status === 401) throw new StripeError("Checkout isn't connected yet: Stripe rejected this key. Copy the Secret key again from Stripe \u2192 Developers \u2192 API keys (click Reveal), and make sure you're looking at the same account and the same test/live mode as the store. Check it at /api/setup.", 503);
-    throw new StripeError("The payment page couldn't be opened. Try again in a moment.", 502);
-  }
-  return j;
-}
-class StripeError extends Error { constructor(m, status) { super(m); this.status = status; } }
-
 /* ---------- Stock (optional KV). sold:<product>:<variant> = number sold so far. ---------- */
 const soldKey = (p, v) => `sold:${p}:${v}`;
 async function soldCount(env, p, v) { if (!env.STOCK) return 0; return Number((await env.STOCK.get(soldKey(p, v))) ?? 0); }
 
 /* ---------- POST /api/checkout ---------- */
-async function checkout(req, env, url, products) {
+async function checkout(req, env, url, store, products) {
   if (Number(req.headers.get("content-length") ?? 0) > 64 * 1024) return bad("That cart is too big to be real.", 413);
   const body = await req.json().catch(() => null);
   if (!body || !Array.isArray(body.items) || !body.items.length) return bad("The cart is empty.");
@@ -337,6 +225,7 @@ async function checkout(req, env, url, products) {
   const region = regionFor(store, String(body.country || ""));
   if (!region) return bad("We don't ship there yet. Write to us and we'll see what we can do.");
   const now = Date.now();
+  const site = store.siteUrl ?? siteOf(env, url);
   const lines = []; const soldOut = []; const meta = []; let subtotal = 0; let shipDate = null;
   for (const it of body.items) {
     const p = products.find((x) => x.id === it.product); const v = p?.variants.find((x) => x.id === it.variant);
@@ -355,7 +244,8 @@ async function checkout(req, env, url, products) {
     const price = variantPrice(p, v); subtotal += price * qty;
     if (p.ship_date && (!shipDate || p.ship_date > shipDate)) shipDate = p.ship_date;
     const name = p.variants.length > 1 ? `${p.title} — ${v.title}` : p.title;
-    lines.push({ quantity: qty, adjustable_quantity: { enabled: true, minimum: 1, maximum: 10 }, price_data: { currency: store.currency, unit_amount: price, product_data: { name, ...(p.ship_date ? { description: `Pre-order: ships ${fmtDate(p.ship_date, store.locale)}` } : {}), ...(p.images?.[0] && /^https?:/.test(p.images[0]) ? { images: [p.images[0]] } : p.images?.[0] ? { images: [`${env.SITE_URL}/${p.images[0]}`] } : {}), metadata: { product: p.id, variant: v.id } } } });
+    const image = p.images?.[0] ? (/^https?:/.test(p.images[0]) ? p.images[0] : `${site}/${p.images[0]}`) : null;
+    lines.push({ quantity: qty, adjustable_quantity: { enabled: true, minimum: 1, maximum: 10 }, price_data: { currency: store.currency, unit_amount: price, product_data: { name, ...(p.ship_date ? { description: `Pre-order: ships ${fmtDate(p.ship_date, store.locale)}` } : {}), ...(image ? { images: [image] } : {}), metadata: { product: p.id, variant: v.id } } } });
     meta.push(`${p.id}:${v.id}:${qty}`);
   }
   if (soldOut.length) return bad(`Sold out while it sat in the cart: ${soldOut.map((s) => s.title).join(", ")}. It's been taken out; the rest is still there.`, 409, { soldOut });
@@ -367,12 +257,11 @@ async function checkout(req, env, url, products) {
     const p = products.find((x) => x.id === it.product);
     return p && isTicket(p);
   });
-  const site = (env.SITE_URL || url.origin).replace(/\/$/, "");
 
   // A short, stable key for the buyer's network, so repeat customers can be recognised without
   // the store keeping anyone's IP. Two orders from the same person share it; it identifies nobody.
   const ip = req.headers.get("cf-connecting-ip") ?? "";
-  const buyerKey = ip ? await shortHash(`${ip}|${env.SESSION_SECRET ?? site}`) : "";
+  const buyerKey = ip ? await shortHash(`${ip}|${(await sessionSecret(env)) ?? site}`) : "";
   const orderIndex = env.STOCK && buyerKey ? Number((await env.STOCK.get(`buyer:${buyerKey}`)) ?? 0) + 1 : 0;
   if (env.STOCK && buyerKey) await env.STOCK.put(`buyer:${buyerKey}`, String(orderIndex), { expirationTtl: 400 * 24 * 3600 });
   const evidence = {
@@ -472,11 +361,12 @@ async function wants(env, url) {
 /* ---------- POST /api/webhook : Stripe tells us an order was paid; we count it against stock ---------- */
 async function webhook(req, env) {
   const raw = await req.text();
-  if (!env.STRIPE_WEBHOOK_SECRET) return bad("Webhook secret not set.", 503);
+  const w = await webhookSecret(env);
+  if (!w) return bad("Orders aren't connected yet: press Connect orders in the admin's Setup.", 503);
   const sig = req.headers.get("stripe-signature") ?? "";
   const t = sig.match(/(?:^|,)t=(\d+)/)?.[1]; const v1s = [...sig.matchAll(/(?:^|,)v1=([a-f0-9]+)/g)].map((m) => m[1]);
   if (!t || !v1s.length || Math.abs(Date.now() / 1000 - Number(t)) > 300) return bad("Bad signature.", 400);
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env.STRIPE_WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(w.secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const mac = [...new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${raw}`)))].map((b) => b.toString(16).padStart(2, "0")).join("");
   if (!v1s.some((v) => timingSafeEqual(v, mac))) return bad("Bad signature.", 400);
   const products = await liveProducts(env);
@@ -506,16 +396,10 @@ async function webhook(req, env) {
   return json({ received: true });
 }
 
-const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const escapeHtmlLite = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /** A short, one-way hash: a rate-limit bucket should not store anyone's address. */
 async function shortHash(s) {
   const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return [...new Uint8Array(d)].slice(0, 8).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function timingSafeEqual(a, b) {
-  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
-  let r = 0; for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i); return r === 0;
 }

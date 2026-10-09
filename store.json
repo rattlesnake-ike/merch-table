@@ -106,9 +106,7 @@
       "title": "Posters"
     }
   ],
-  "owners": [
-    "band@example.com"
-  ],
+  "owners": [],
   "look": {
     "corners": "square",
     "headings": "uppercase",

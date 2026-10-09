@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, copyFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname, extname, basename } from "node:path";
 import { createHash } from "node:crypto";
-import { validate, merchJson } from "./lib.mjs";
+import { validate, merchJson, lookCss, FONTS } from "./lib.mjs";
 import { indexPage, productPage, cartPage, thanksPage, shippingPage, notFoundPage, rss, sitemap } from "./templates.mjs";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -43,10 +43,10 @@ for (const p of products) p.images = await Promise.all((p.images ?? []).map(loca
 // Pages
 write("index.html", indexPage(store, products));
 for (const p of products) write(`products/${p.id}/index.html`, productPage(store, p, products));
-write("cart/index.html", cartPage(store));
-write("thanks/index.html", thanksPage(store));
-write("shipping/index.html", shippingPage(store));
-write("404.html", notFoundPage(store));
+write("cart/index.html", cartPage(store, products));
+write("thanks/index.html", thanksPage(store, products));
+write("shipping/index.html", shippingPage(store, products));
+write("404.html", notFoundPage(store, products));
 
 // Feeds and machine-readable files
 write("merch.json", JSON.stringify(merchJson(store, products, siteUrl), null, 1));
@@ -62,37 +62,19 @@ redirects.push("/collections/all / 301", "/collections/* / 301", "/products/:id 
 write("_redirects", redirects.join("\n") + "\n");
 write("_headers", `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=()\n  Content-Security-Policy: default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self' https:; frame-ancestors 'none'; base-uri 'self'\n/images/*\n  Cache-Control: public, max-age=31536000, immutable\n`);
 
-// Styles and script, with the store's colours and shipping table written in.
-// The look: colours, corners, heading case, and a font, all from store.json.
+// Styles and script. The look (colours, corners, heading case, a font) comes from store.json
+// through lookCss(), which the Worker also applies at request time so a change in the admin shows
+// without a rebuild. Appended, not prepended: in CSS the last declaration wins, so the band's values
+// must come after the defaults. Anything YOU write in site.css still wins over these when you set
+// "look": { "raw": true } in store.json. See BRAND.md, "what the build adds".
 const look = store.look ?? {};
-const FONTS = {
-  system: `ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif`,
-  grotesk: `"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif`,
-  serif: `ui-serif,Georgia,"Times New Roman",serif`,
-  slab: `"Rockwell","Courier Bold",Georgia,serif`,
-  mono: `ui-monospace,SFMono-Regular,Menlo,Consolas,monospace`,
-  rounded: `ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",system-ui,sans-serif`,
-};
-const face = FONTS[look.font] ?? (look.font ? `${look.font},${FONTS.system}` : FONTS.system);
-const radius = look.corners === "round" ? "10px" : look.corners === "soft" ? "4px" : "0px";
-const headingCase = look.headings === "normal" ? "none" : look.headings === "small-caps" ? "lowercase" : "uppercase";
-// Appended, not prepended: in CSS the last declaration wins, so the band's values must come after the defaults.
-let css = readFileSync(join(root, "src/site.css"), "utf8");
-// Appended last, so it wins over the stylesheet's defaults. Anything YOU write in site.css
-// after this point in the cascade still wins over these, because this block is inserted
-// BEFORE your own additions below. See BRAND.md, "what the build adds".
-css += `\n/* the band's look, from store.json */\n:root{--ink:${store.colors?.ink ?? "#141416"};--paper:${store.colors?.paper ?? "#f3f1ea"};--accent:${store.colors?.accent ?? "#2743d0"};--radius:${radius};--display:${face};--body:${face}}\n`;
-// These two lines are a convenience for bands who only want the settings. If you are
-// restyling properly, set "look": { "raw": true } in store.json and they are not added,
-// so nothing of yours gets overridden.
-if (!look.raw) css += `h1,h2,h3{text-transform:${headingCase}}\n.card,.btn,input,select,textarea,.restock,.sz{border-radius:var(--radius)}\n`;
-if (look.font && !FONTS[look.font]) {
-  if (existsSync(join(root, "public/fonts/fonts.css"))) css = `/* your face, declared in public/fonts/fonts.css */\n@import "/fonts/fonts.css";\n` + css;
-  else console.warn(`store.json asks for the font "${look.font}", but public/fonts/fonts.css does not exist, so nothing declares it. Copy public/fonts/fonts.css.example to public/fonts/fonts.css and edit it. (See BRAND.md.)`);
-}
-write("site.css", css);
-const js = `window.__store=${JSON.stringify({ currency: store.currency.toUpperCase(), locale: store.locale ?? "en-US" })};window.__shipping=${JSON.stringify(store.shipping.map(({ id, name, countries, amount, free_over, estimate }) => ({ id, name, countries, amount, free_over, estimate })))};window.__tickets=${JSON.stringify(products.filter((p) => p.show?.date).map((p) => p.id))};\n` + readFileSync(join(root, "src/site.js"), "utf8");
-write("site.js", js);
+const hasFontsCss = existsSync(join(root, "public/fonts/fonts.css"));
+if (look.font && !FONTS[look.font] && !hasFontsCss) console.warn(`store.json asks for the font "${look.font}", but public/fonts/fonts.css does not exist, so nothing declares it. Copy public/fonts/fonts.css.example to public/fonts/fonts.css and edit it. (See BRAND.md.)`);
+const { head, tail } = lookCss(store, { hasFontsCss });
+write("site.css", head + readFileSync(join(root, "src/site.css"), "utf8") + tail);
+// The values site.js needs (currency, shipping table, which products are tickets) are written
+// into every page by the templates, so the script itself is served as-is.
+write("site.js", readFileSync(join(root, "src/site.js"), "utf8"));
 
 // Anything in ./public is copied as-is (fonts, extra pages, a logo).
 const pub = join(root, "public");

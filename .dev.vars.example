@@ -1,14 +1,15 @@
-# Secrets. Copy this file to .dev.vars for local work; on Cloudflare they are Worker secrets.
+# The three things the Deploy button asks for. On your laptop, copy this file to .dev.vars and fill it in.
 # Never commit .dev.vars. Never put these in wrangler.jsonc.
 
 # Your Stripe SECRET key. In Stripe: Developers -> API keys -> Secret key -> click "Reveal".
-# It starts with sk_test_ (practice mode) or sk_live_ (real money). Use sk_test_ until you have tested an order.
+# It starts with sk_test_ (practice mode) or sk_live_ (real money). Use sk_test_ until a test order has worked.
 # NOT the Publishable key (pk_...) -- that is the one Stripe shows first, and it will not work here.
-STRIPE_SECRET_KEY=sk_test_paste_the_secret_key_here
+STRIPE_SECRET_KEY=
 
-# Optional. Only needed if you want sold-out sizes to update themselves as orders come in.
-# In Stripe: Developers -> Webhooks -> your endpoint -> Signing secret. Starts with whsec_.
-STRIPE_WEBHOOK_SECRET=
-
-# Optional. Any long random string you invent. It lets you download the back-in-stock list.
+# The password for your store's admin. Make up something long; a password manager's suggestion is ideal.
+# You type it once per phone or laptop to sign in at /admin. It also signs ticket codes, so keep it private.
 ADMIN_KEY=
+
+# Your email. It becomes the store's contact address until you change it in the admin, and lets you
+# sign in by email later if you add a mail service. Several people: separate the addresses with commas.
+OWNER_EMAIL=

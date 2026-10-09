@@ -2,6 +2,8 @@
    There is no ticketing company in the middle: the band sells from their own store, the fan
    pays card fees and nothing else, and the door is a phone with a web page open. */
 
+import { sessionSecret } from "./live.js";
+
 const enc = new TextEncoder();
 const b32 = (bytes) => { const A = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; let out = ""; for (const b of bytes) out += A[b >> 3] + A[((b & 7) << 2) % 32]; return out; };
 
@@ -75,13 +77,14 @@ export const showOff = (p) => showStatus(p).state === "cancelled";
 /** The tickets in one paid order. */
 export async function ticketsForOrder(env, order, products) {
   const out = [];
+  const secret = (await sessionSecret(env)) ?? "unset";
   for (const part of String(order.items ?? "").split(",").filter(Boolean)) {
     const [pid, vid, qty] = part.split(":");
     const p = products.find((x) => x.id === pid);
     if (!isTicket(p)) continue;
     for (let i = 0; i < (Number(qty) || 1); i++) {
       const seq = `${pid}:${vid}:${i}`;
-      out.push({ product: p, variant: vid, seq, code: await ticketCode(env.SESSION_SECRET ?? "unset", order.id, seq) });
+      out.push({ product: p, variant: vid, seq, code: await ticketCode(secret, order.id, seq) });
     }
   }
   return out;

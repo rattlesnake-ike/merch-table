@@ -1,7 +1,7 @@
 // Page templates. Plain functions that return HTML strings. Edit freely; nothing here is magic.
-import { esc, money, fmtDate, variantPrice, isLive, variantAvailable } from "./lib.mjs";
+import { esc, money, fmtDate, variantPrice, isLive, variantAvailable, pageConfig } from "./lib.mjs";
 
-export function shell({ store, title, description, body, path, image, jsonld, extraHead = "" }) {
+export function shell({ store, title, description, body, path, image, jsonld, extraHead = "", products = [] }) {
   const siteUrl = store.siteUrl;
   const t = title ? `${title} · ${store.name}` : store.name;
   return `<!doctype html>
@@ -23,6 +23,7 @@ export function shell({ store, title, description, body, path, image, jsonld, ex
 ${image ? `<meta property="og:image" content="${esc(image.startsWith("http") ? image : siteUrl + "/" + image)}">` : ""}
 <meta name="twitter:card" content="${image ? "summary_large_image" : "summary"}">
 ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld)}</script>` : ""}
+${pageConfig(store, products)}
 ${extraHead}
 </head>
 <body>
@@ -72,7 +73,7 @@ export function indexPage(store, products) {
   ${store.tagline ? `<p class="lede">${esc(store.tagline)}</p>` : ""}
 </section>
 ${sections.map((s) => `<section class="sec" id="${esc(s.kind)}"><h2>${esc(s.title)}</h2><div class="grid">${s.items.map((p) => productCard(store, p)).join("")}</div></section>`).join("")}`;
-  return shell({ store, body, path: "/", image: shown[0]?.images?.[0], jsonld: { "@context": "https://schema.org", "@type": "Store", name: store.name, url: store.siteUrl, ...(store.email ? { email: store.email } : {}) } });
+  return shell({ store, products, body, path: "/", image: shown[0]?.images?.[0], jsonld: { "@context": "https://schema.org", "@type": "Store", name: store.name, url: store.siteUrl, ...(store.email ? { email: store.email } : {}) } });
 }
 
 export function productPage(store, p, products) {
@@ -113,10 +114,10 @@ export function productPage(store, p, products) {
   </div>
 </article>`;
   const offers = p.variants.map((v) => ({ "@type": "Offer", name: v.title, price: (variantPrice(p, v) / 100).toFixed(2), priceCurrency: store.currency.toUpperCase(), availability: variantAvailable(v) && live ? "https://schema.org/InStock" : live ? "https://schema.org/OutOfStock" : "https://schema.org/PreOrder", url: `${store.siteUrl}/products/${p.id}/` }));
-  return shell({ store, title: p.title, description: (p.description ?? "").split("\n")[0].slice(0, 160), body, path: `/products/${p.id}/`, image: p.images?.[0], jsonld: { "@context": "https://schema.org", "@type": "Product", name: p.title, description: p.description, image: (p.images ?? []).map((i) => `${store.siteUrl}/${i}`), brand: { "@type": "Brand", name: store.name }, offers } });
+  return shell({ store, products, title: p.title, description: (p.description ?? "").split("\n")[0].slice(0, 160), body, path: `/products/${p.id}/`, image: p.images?.[0], jsonld: { "@context": "https://schema.org", "@type": "Product", name: p.title, description: p.description, image: (p.images ?? []).map((i) => `${store.siteUrl}/${i}`), brand: { "@type": "Brand", name: store.name }, offers } });
 }
 
-export function cartPage(store) {
+export function cartPage(store, products = []) {
   const regions = store.shipping.map((r) => `<optgroup label="${esc(r.name)}">${r.countries.map((c) => `<option value="${c}">${esc(countryName(c, store.locale))}</option>`).join("")}</optgroup>`).join("");
   const body = `
 <section class="cartpage">
@@ -136,10 +137,10 @@ export function cartPage(store) {
     </form>
   </div>
 </section>`;
-  return shell({ store, title: "Cart", body, path: "/cart/", extraHead: `<meta name="robots" content="noindex">` });
+  return shell({ store, products, title: "Cart", body, path: "/cart/", extraHead: `<meta name="robots" content="noindex">` });
 }
 
-export function thanksPage(store) {
+export function thanksPage(store, products = []) {
   const body = `
 <section class="thanks">
   <h1>Thank you.</h1>
@@ -148,10 +149,10 @@ export function thanksPage(store) {
   <p>You can check on it any time at <a href="/orders">Where&rsquo;s my order</a>, with the email you paid with. Questions, or something wrong: <a href="mailto:${esc(store.email ?? "")}">${esc(store.email ?? "write to the band")}</a>. A person reads it.</p>
   <p><a class="btn ghost" href="/">Back to the table</a></p>
 </section>`;
-  return shell({ store, title: "Thank you", body, path: "/thanks/", extraHead: `<meta name="robots" content="noindex">` });
+  return shell({ store, products, title: "Thank you", body, path: "/thanks/", extraHead: `<meta name="robots" content="noindex">` });
 }
 
-export function shippingPage(store) {
+export function shippingPage(store, products = []) {
   const rows = store.shipping.map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${money(r.amount, store.currency, store.locale)}${r.free_over ? `<br><small>free over ${money(r.free_over, store.currency, store.locale)}</small>` : ""}</td><td>${esc(r.estimate ?? "")}</td></tr>`).join("");
   const body = `
 <section class="prose">
@@ -164,11 +165,11 @@ export function shippingPage(store) {
   <p>${esc(store.returns ?? "Wrong size, or something arrived damaged? Write to us within 30 days and we'll swap it or refund it. You cover return postage for a size swap; we cover it if it's our mistake.")}</p>
   <p>Write to <a href="mailto:${esc(store.email ?? "")}">${esc(store.email ?? "")}</a> with your order number from the receipt.</p>
 </section>`;
-  return shell({ store, title: "Shipping and returns", body, path: "/shipping/" });
+  return shell({ store, products, title: "Shipping and returns", body, path: "/shipping/" });
 }
 
-export function notFoundPage(store) {
-  return shell({ store, title: "Not found", body: `<section class="prose"><h1>That page isn't here.</h1><p class="lede">It may have moved when we moved the store. <a href="/">Everything is on the front page.</a></p></section>`, path: "/404.html", extraHead: `<meta name="robots" content="noindex">` });
+export function notFoundPage(store, products = []) {
+  return shell({ store, products, title: "Not found", body: `<section class="prose"><h1>That page isn't here.</h1><p class="lede">It may have moved when we moved the store. <a href="/">Everything is on the front page.</a></p></section>`, path: "/404.html", extraHead: `<meta name="robots" content="noindex">` });
 }
 
 const names = { US: "United States", CA: "Canada", GB: "United Kingdom", IE: "Ireland", FR: "France", DE: "Germany", NL: "Netherlands", BE: "Belgium", ES: "Spain", IT: "Italy", PT: "Portugal", SE: "Sweden", NO: "Norway", DK: "Denmark", FI: "Finland", AT: "Austria", CH: "Switzerland", PL: "Poland", CZ: "Czechia", AU: "Australia", NZ: "New Zealand", JP: "Japan", MX: "Mexico", BR: "Brazil", KR: "South Korea", SG: "Singapore", HK: "Hong Kong", TW: "Taiwan", AR: "Argentina", CL: "Chile", ZA: "South Africa", IN: "India", IL: "Israel", GR: "Greece", HU: "Hungary", RO: "Romania", IS: "Iceland", LU: "Luxembourg" };

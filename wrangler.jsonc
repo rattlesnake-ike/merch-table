@@ -1,6 +1,7 @@
 {
-  // Cloudflare Workers config. The store's pages are static files in ./dist;
-  // the Worker only answers /api/* (checkout, order lookup, stock, restock requests).
+  // Cloudflare Workers config. The store's pages are rendered by the Worker from store.json,
+  // products.json and the band's live edits; images, the stylesheet and the script are static
+  // files in ./dist. Nothing in this file needs changing to deploy your own store.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "merch-table",
   "main": "worker/index.js",
@@ -9,21 +10,27 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/admin", "/admin/*", "/orders", "/orders/*", "/tickets", "/tickets/*", "/", "/products/*"]
+    "run_worker_first": ["/", "/products/*", "/cart", "/cart/", "/thanks", "/thanks/", "/shipping", "/shipping/", "/site.css", "/img/*", "/merch.json", "/feed.xml", "/sitemap.xml", "/robots.txt", "/api/*", "/admin", "/admin/*", "/orders", "/orders/*", "/tickets", "/tickets/*"]
   },
   "observability": { "enabled": true },
-  // Stock counting and back-in-stock requests need a KV namespace. Without one the
-  // store still works: sizes are sold out only when you mark them so in products.json.
-  // To turn counting on:  npx wrangler kv namespace create STOCK   then paste the id here.
-  // "kv_namespaces": [{ "binding": "STOCK", "id": "paste-the-id-here" }],
-  // Replace this id with your own: npx wrangler kv namespace create STOCK
-  // (the id below belongs to the public demo; a forked store must not share it)
-  "kv_namespaces": [{ "binding": "STOCK", "id": "bf5034b2c9744d2fa6088ca60fa8197d" }],
-  "vars": {
-    // The public address of the store, no trailing slash. Stripe sends fans back here.
-    "SITE_URL": "https://merch-table-demo.isaac-holze.workers.dev",
-    // Only on the public demo: lets anyone look around the admin without signing in.
-    // Saves are refused. NEVER set this on a real store — it shows your product list to everyone.
-    "DEMO_ADMIN": "1"
+  // Where the admin's edits, orders, ticket check-ins and stock counts live. No id on purpose:
+  // the Deploy button and `wrangler deploy` both create a namespace for you and bind it here,
+  // and later deploys reuse the one already bound to the Worker.
+  "kv_namespaces": [{ "binding": "STOCK" }],
+  // Optional settings go in Cloudflare → your store → Settings → Variables and Secrets, not here:
+  //   SITE_URL   only if fans reach the store at an address other than the one it answers on
+  //   OWNER_EMAIL, ADMIN_KEY, STRIPE_SECRET_KEY, RESEND_API_KEY, MAIL_FROM   (see .dev.vars.example)
+  // The public demo at merch-table-demo.isaac-holze.workers.dev. Not for your store.
+  "env": {
+    "demo": {
+      "name": "merch-table-demo",
+      "kv_namespaces": [{ "binding": "STOCK", "id": "bf5034b2c9744d2fa6088ca60fa8197d" }],
+      "vars": {
+        "SITE_URL": "https://merch-table-demo.isaac-holze.workers.dev",
+        // Lets anyone look around the admin without signing in. Saves are refused.
+        // NEVER set this on a real store — it shows your product list and orders screen to everyone.
+        "DEMO_ADMIN": "1"
+      }
+    }
   }
 }

@@ -91,3 +91,39 @@ export function validate(store, products) {
   }
   return errs;
 }
+
+/* ---------- The band's look, shared by the build and the Worker ---------- */
+export const FONTS = {
+  system: `ui-sans-serif,system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif`,
+  grotesk: `"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif`,
+  serif: `ui-serif,Georgia,"Times New Roman",serif`,
+  slab: `"Rockwell","Courier Bold",Georgia,serif`,
+  mono: `ui-monospace,SFMono-Regular,Menlo,Consolas,monospace`,
+  rounded: `ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",system-ui,sans-serif`,
+};
+const safeColor = (c, fallback) => (/^#[0-9a-fA-F]{3,8}$/.test(String(c ?? "")) ? c : fallback);
+/**
+ * What gets added to site.css from store.json: `head` goes before the stylesheet (an @import for a
+ * custom face), `tail` after it (colours, corners, heading case). In CSS the last declaration wins,
+ * so the band's values must come after the defaults. A band restyling properly sets look.raw and
+ * only the custom properties are added.
+ */
+export function lookCss(store, { hasFontsCss = false } = {}) {
+  const look = store.look ?? {};
+  const face = FONTS[look.font] ?? (look.font ? `${String(look.font).replace(/[^\w\s"'-]/g, "")},${FONTS.system}` : FONTS.system);
+  const radius = look.corners === "round" ? "10px" : look.corners === "soft" ? "4px" : "0px";
+  const headingCase = look.headings === "normal" ? "none" : look.headings === "small-caps" ? "lowercase" : "uppercase";
+  const c = store.colors ?? {};
+  let tail = `\n/* the band's look, from store.json */\n:root{--ink:${safeColor(c.ink, "#141416")};--paper:${safeColor(c.paper, "#f3f1ea")};--accent:${safeColor(c.accent, "#2743d0")};--radius:${radius};--display:${face};--body:${face}}\n`;
+  if (!look.raw) tail += `h1,h2,h3{text-transform:${headingCase}}\n.card,.btn,input,select,textarea,.restock,.sz{border-radius:var(--radius)}\n`;
+  const head = look.font && !FONTS[look.font] && hasFontsCss ? `/* your face, declared in public/fonts/fonts.css */\n@import "/fonts/fonts.css";\n` : "";
+  return { head, tail };
+}
+
+/** The few values site.js needs from the data, written into every page so a live edit reaches the cart. */
+export function pageConfig(store, products = []) {
+  const cfg = { currency: store.currency.toUpperCase(), locale: store.locale ?? "en-US" };
+  const shipping = store.shipping.map(({ id, name, countries, amount, free_over, estimate }) => ({ id, name, countries, amount, free_over, estimate }));
+  const tickets = products.filter((p) => p.show?.date).map((p) => p.id);
+  return `<script>window.__store=${JSON.stringify(cfg)};window.__shipping=${JSON.stringify(shipping)};window.__tickets=${JSON.stringify(tickets)};</script>`;
+}
