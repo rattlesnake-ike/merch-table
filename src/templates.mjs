@@ -39,7 +39,7 @@ ${extraHead}
 ${body}
 </main>
 <footer class="foot">
-  <p>${esc(store.name)}${store.email ? ` · <a href="mailto:${esc(store.email)}">${esc(store.email)}</a>` : ""} · <a href="/orders">Where's my order?</a> · <a href="/shipping/">Shipping and returns</a> · <a href="/feed.xml">RSS</a></p>
+  <p>${esc(store.name)}${store.email ? ` · <a href="mailto:${esc(store.email)}">${esc(store.email)}</a>` : ""} · <a href="/orders">Where's my order?</a> · <a href="/shipping/">Shipping and returns</a> · <a href="/feed.xml">RSS</a> · <a href="/admin" rel="nofollow">Run this store</a></p>
   ${store.mailing_list?.action ? `<form class="list" action="${esc(store.mailing_list.action)}" method="post" target="_blank"><label for="ml">${esc(store.mailing_list.label ?? "Get an email when there is something new.")}</label><div><input id="ml" name="email" type="email" required placeholder="you@example.com" autocomplete="email"><button type="submit">Sign up</button></div></form>` : ""}
   <p class="fine">No tracking on this site. The only outside call is to the payment page when you check out.</p>
 </footer>

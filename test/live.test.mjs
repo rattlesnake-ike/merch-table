@@ -149,3 +149,41 @@ test("every page carries what the cart needs, including which products are ticke
   assert.match(html, /window\.__shipping=\[/);
   assert.match(html, new RegExp(`"currency":"${store.currency.toUpperCase()}"`));
 });
+
+import { saveStripeKey, stripeKey, withStripeKey, removeSamples, sampleIds } from "../worker/live.js";
+
+test("the Stripe key pasted in the admin is kept encrypted under the admin password and read back whole", async () => {
+  const kv = fakeKV();
+  const env = { STOCK: kv, ADMIN_KEY: "a long admin password" };
+  const r = await saveStripeKey(env, "sk_test_" + "a".repeat(40));
+  assert.equal(r.ok, true);
+  const stored = [...kv.raw.entries()].find(([k]) => k.startsWith("stripekey@"))[1];
+  assert.doesNotMatch(stored, /sk_test_/, "the key is not in KV in the clear");
+  assert.equal(await stripeKey(env, r.fresh), "sk_test_" + "a".repeat(40));
+  assert.equal(await stripeKey({ STOCK: kv, ADMIN_KEY: "a different password" }, r.fresh), "", "another password cannot open it");
+  const resolved = await withStripeKey(env, r.fresh);
+  assert.equal(resolved.STRIPE_SECRET_KEY, "sk_test_" + "a".repeat(40));
+  assert.equal(resolved.STRIPE_KEY_FROM, "admin");
+  assert.equal(resolved.STOCK, kv, "the bindings ride along");
+});
+
+test("an environment Stripe key always wins over the stored one", async () => {
+  const kv = fakeKV();
+  const env = { STOCK: kv, ADMIN_KEY: "pw", STRIPE_SECRET_KEY: "sk_live_" + "b".repeat(40) };
+  await saveStripeKey(env, "sk_test_" + "a".repeat(40));
+  assert.equal(await stripeKey(env), "sk_live_" + "b".repeat(40));
+  assert.equal(await withStripeKey(env), env, "untouched");
+});
+
+test("the sample products go in one tap and the band's own stay", async () => {
+  const mine = { id: "my-tee", title: "My tee", price: 2000, kind: "apparel", description: "", images: [], variants: [{ id: "one", title: "One size", available: true }] };
+  const kv = fakeKV({ catalogue: [...builtProducts, mine] });
+  const env = { STOCK: kv };
+  const before = await liveProducts(env);
+  assert.equal(sampleIds(before).length, builtProducts.length, "every shipped product is a sample");
+  const r = await removeSamples(env, store, before, "test");
+  assert.equal(r.ok, true);
+  const after = await liveProducts(env, r.fresh);
+  assert.deepEqual(after.map((p) => p.id), ["my-tee"]);
+  assert.deepEqual((await liveProducts(env)).map((p) => p.id), ["my-tee"], "and they do not come back from products.json");
+});

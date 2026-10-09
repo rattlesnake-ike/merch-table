@@ -1,15 +1,10 @@
-# The three things the Deploy button asks for. On your laptop, copy this file to .dev.vars and fill it in.
-# Never commit .dev.vars. Never put these in wrangler.jsonc.
-
-# Your Stripe SECRET key. In Stripe: Developers -> API keys -> Secret key -> click "Reveal".
-# It starts with sk_test_ (practice mode) or sk_live_ (real money). Use sk_test_ until a test order has worked.
-# NOT the Publishable key (pk_...) -- that is the one Stripe shows first, and it will not work here.
-STRIPE_SECRET_KEY=
+# The one thing the Deploy button asks for. On your laptop, copy this file to .dev.vars and fill it in.
+# Never commit .dev.vars. Never put secrets in wrangler.jsonc.
 
 # The password for your store's admin. Make up something long; a password manager's suggestion is ideal.
-# You type it once per phone or laptop to sign in at /admin. It also signs ticket codes, so keep it private.
+# You type it once per phone or laptop to sign in at /admin. Everything else (your Stripe key, your
+# contact email, your products) is entered in the admin itself.
 ADMIN_KEY=
 
-# Your email. It becomes the store's contact address until you change it in the admin, and lets you
-# sign in by email later if you add a mail service. Several people: separate the addresses with commas.
-OWNER_EMAIL=
+# Optional, for a laptop: a Stripe key here saves pasting it in the admin while you work locally.
+# STRIPE_SECRET_KEY=

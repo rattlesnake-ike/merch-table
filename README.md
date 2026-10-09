@@ -20,26 +20,21 @@ You need three free accounts, all in the band's name: [Stripe](https://dashboard
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/rattlesnake-ike/merch-table)
 
-Click the button. Cloudflare copies this repository into your GitHub account, asks you for three things, creates the storage the admin needs, builds the store and gives you a `*.workers.dev` address. From then on, every push to your copy redeploys the store — but you will rarely need to push anything.
+Click the button. Cloudflare copies this repository into your GitHub account, asks you for **one thing** — a password for your store's admin (`ADMIN_KEY`; make up something long and keep it) — creates the storage the admin needs, builds the store and gives you a `*.workers.dev` address. From then on, every push to your copy redeploys the store — but you will rarely need to push anything.
 
 **Give the project a name nobody has used**, like `yourband-store`. If you see a red *"Cloudflare could not create the Git repository"*, that name is already taken in your GitHub account: change it and click Deploy again.
-
-| It asks for | Where to find it |
-|---|---|
-| `STRIPE_SECRET_KEY` | Stripe → **Developers → API keys → Secret key → Reveal**. It starts with **`sk_test_`**. ⚠️ Not the *Publishable* key (`pk_…`), which is the one Stripe shows first and the most common mistake here. |
-| `ADMIN_KEY` | The password for your store's admin. Make up something long. |
-| `OWNER_EMAIL` | Your email. It becomes the store's contact address until you change it, and lets you sign in by email later. |
 
 Prefer the command line? `git clone`, `npm install`, copy `.dev.vars.example` to `.dev.vars` and fill it in, then `npm run deploy`. Wrangler creates the storage for you too.
 
 ### 2. Open the admin
 
-Go to **`your-store-address/admin`** on your phone and type the admin password. You're in.
+Go to **`your-store-address/admin`** on your phone and type the password. You land on **Setup**, which checks whether the store can take money and names anything that isn't right, with the fix in the same row:
 
-- **Setup** checks whether the store can take money and names anything that isn't right. Press **Connect orders** once: the store registers itself with Stripe so orders arrive and stock is counted. Nothing to copy.
-- **Store** is the band's name, the contact address, the colours (pick them out of your artwork), the type and the corners.
-- **Add a product**: a name, a price, the sizes, a photo from your camera roll. It's on sale when you press the button.
-- Coming from Shopify? **Import from Shopify**: in your Shopify admin, **Products → Export → All products → Plain CSV**, then choose the file in the admin. Names, prices, sizes, stock, descriptions and pictures come across, and every product keeps its old address, so links to `/products/<name>` still work.
+- **Paste your Stripe secret key.** In Stripe: **Developers → API keys → Secret key → Reveal**; it starts with `sk_test_`. ⚠️ Not the *Publishable* key (`pk_…`), which is the one Stripe shows first. The store checks the key with Stripe on the spot, keeps it encrypted under your admin password, and connects itself to Stripe so orders arrive and stock is counted. Nothing to copy anywhere else.
+- **Type the contact email.** It goes on every page and receipt. A person must read it.
+- **Remove the sample products** in one tap when you have your own.
+
+Then **Store** (the band's name, the colours picked out of your artwork, the type) and **Add a product**: a name, a price, the sizes, a photo from your camera roll. It's on sale when you press the button. Coming from Shopify? **Import from Shopify**: in your Shopify admin, **Products → Export → All products → Plain CSV**, then choose the file in the admin. Names, prices, sizes, stock, descriptions and pictures come across, and every product keeps its old address, so links to `/products/<name>` still work.
 
 ### 3. Try it
 
@@ -47,16 +42,15 @@ Add a shirt to the cart and check out with card number `4242 4242 4242 4242`, an
 
 ### 4. Your own domain
 
-Buy it at [Cloudflare](https://www.cloudflare.com/products/registrar/), [Porkbun](https://porkbun.com/) or [Namecheap](https://www.namecheap.com/), in the band's name. In Cloudflare: **Workers & Pages → your store → Settings → Domains & Routes → Add → Custom domain**, and type `shop.yourband.com`. If your DNS is elsewhere, Cloudflare shows you the one CNAME record to add at your registrar. Nothing in the store needs changing; it answers at whatever address it's reached on. Press **Connect orders** once more so Stripe uses the new address.
+Buy it at [Cloudflare](https://www.cloudflare.com/products/registrar/), [Porkbun](https://porkbun.com/) or [Namecheap](https://www.namecheap.com/), in the band's name. In Cloudflare: **Workers & Pages → your store → Settings → Domains & Routes → Add → Custom domain**, and type `shop.yourband.com`. If your DNS is elsewhere, Cloudflare shows you the one CNAME record to add at your registrar. Nothing in the store needs changing; it answers at whatever address it's reached on, and reconnects itself to Stripe the next time you open Setup.
 
 ### 5. Go live
 
 1. Stripe Dashboard → turn off **Test mode** → Developers → API keys → copy the live secret key.
-2. Cloudflare → your store → **Settings → Variables and Secrets** → edit `STRIPE_SECRET_KEY` → paste it.
-3. In the admin's **Setup**, press **Connect orders** again (Stripe keeps test and live apart).
-4. In Stripe: **Settings → Payment methods**: turn on Apple Pay, Google Pay and Link. **Settings → Emails**: turn on "Successful payments" so fans get receipts. **Products → Coupons** for any discount codes.
-5. Buy the cheapest thing yourself with a real card and refund it in Stripe. Check the receipt, the shipping line, and that the thank-you page shows the order.
-6. Point everything at the new address: your homepage, Bandcamp, social bios. If you're leaving Shopify, set its store to redirect to yours for 90 days, then cancel once the last order ships.
+2. In the admin's **Setup**, paste it into the Stripe key row. The store checks it and reconnects itself (Stripe keeps test and live apart).
+3. Setup tells you if Apple Pay, Google Pay or Link are off in your Stripe account (**Settings → Payment methods**). In Stripe also turn on **Settings → Emails → Successful payments** so fans get receipts, and make any discount codes under **Products → Coupons**.
+4. Buy the cheapest thing yourself with a real card and refund it in Stripe. Check the receipt, the shipping line, and that the thank-you page shows the order.
+5. Point everything at the new address: your homepage, Bandcamp, social bios. If you're leaving Shopify, set its store to redirect to yours for 90 days, then cancel once the last order ships.
 
 ---
 
@@ -64,7 +58,7 @@ Buy it at [Cloudflare](https://www.cloudflare.com/products/registrar/), [Porkbun
 
 Most days you don't touch a file. Go to **`your-store-address/admin`**, sign in with the admin password (you stay signed in on that phone for a month), tap a product, change it, save. It's live straight away.
 
-**What the admin does:** add a product with photos, change a price, rename it, edit its description, add sizes, mark any size sold out or back in, set or clear a pre-order ship date, move it to another section, hide it or remove it; change the store's name, contact address, colours and type; import a Shopify export; see orders and put tracking numbers on them; a dispute pack per order; the door for tickets; refunds for a cancelled show.
+**What the admin does:** Setup (the Stripe key, the contact address, the sample products, and a check of everything that has to be right); add a product with photos, change a price, rename it, edit its description, add sizes, mark any size sold out or back in, set or clear a pre-order ship date, move it to another section, hide it or remove it; change the store's name, contact address, colours and type; import a Shopify export; see orders and put tracking numbers on them; a dispute pack per order; the door for tickets; refunds for a cancelled show.
 
 **Signing in by email** instead of the password is optional: add a [Resend](https://resend.com) API key as `RESEND_API_KEY` and `MAIL_FROM` at your domain, and the owners listed in `OWNER_EMAIL` (several addresses, comma-separated) get a one-time link.
 
@@ -165,7 +159,7 @@ scripts/          import-shopify.mjs, check.mjs
 - Prices are never trusted from the browser. The Worker prices every line from the live catalogue; the cart only says which items and how many.
 - The Worker refuses sold-out sizes, hidden products, unreleased drops and countries you don't ship to, before Stripe is involved.
 - No third-party scripts. The Content-Security-Policy header only allows this site and the Stripe redirect. Blocking every tracker changes nothing.
-- Secrets live in Cloudflare's encrypted secrets, never in the repo. `.dev.vars` is git-ignored. The session secret is derived from `ADMIN_KEY` (set `SESSION_SECRET` to pick your own); the webhook secret the store registers for itself is kept in storage (set `STRIPE_WEBHOOK_SECRET` to override it).
+- Secrets never touch the repo. `ADMIN_KEY` is a Cloudflare secret; `.dev.vars` is git-ignored. The Stripe key you paste in Setup is kept in storage encrypted (AES-GCM) under a key derived from `ADMIN_KEY`, the same secret that already guards the whole store; set `STRIPE_SECRET_KEY` as a Cloudflare secret instead if you prefer, and it wins. The session secret is derived from `ADMIN_KEY` too (`SESSION_SECRET` overrides); the webhook secret the store registers for itself is kept in storage (`STRIPE_WEBHOOK_SECRET` overrides).
 - Webhook signatures are checked (HMAC, five-minute window), and each order is counted once even when Stripe retries.
 - Photos uploaded in the admin are shrunk in the browser before upload and served from your own address with a year-long cache.
 

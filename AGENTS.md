@@ -5,7 +5,7 @@ This is a band's merch store. Read README.md first; it says what everything is a
 Rules that hold no matter what the band asks for:
 
 - Never create an account on the band's behalf, and never ask for a password. When a service is needed, say exactly what to click and what it costs, then wait.
-- Secrets stay out of the repo: `.dev.vars` locally, Worker secrets on Cloudflare. Never put a key in `wrangler.jsonc` or in any committed file. The three the store needs are `STRIPE_SECRET_KEY`, `ADMIN_KEY` (the admin password; the session secret is derived from it) and `OWNER_EMAIL`.
+- Secrets stay out of the repo: `.dev.vars` locally, Worker secrets on Cloudflare. Never put a key in `wrangler.jsonc` or in any committed file. The one the store needs at deploy is `ADMIN_KEY` (the admin password; the session secret is derived from it). The Stripe key is pasted in the admin's Setup and kept in KV encrypted under `ADMIN_KEY` (`worker/live.js`, `withStripeKey`); a `STRIPE_SECRET_KEY` secret overrides it. `OWNER_EMAIL` is optional (email sign-in, default contact address).
 - No analytics, ad pixels, social pixels, link shorteners or third-party scripts. The store's only outside calls are to Stripe (and a price feed, only if the band takes coins). The Content-Security-Policy in `src/build.mjs` enforces this; loosen it only if the band asks and understands.
 - Prices, stock and names are the band's. Never invent products or change a price unless told.
 - If a step costs money, say the amount first. If a step is irreversible (DNS, cancelling a plan, switching Stripe to live), confirm first.
@@ -18,7 +18,7 @@ How the code fits together:
 - `worker/live.js` is what is actually on sale: those files plus the band's edits from the admin, kept in KV as versioned records (the writer's browser carries the version it wrote in a cookie, so it reads its own change at once while KV converges). A product pushed in `products.json` still appears; one removed in the admin stays removed. If you change the shape of a product, change `validate()` in `src/lib.mjs` with it, because the admin's saves run through the same check.
 - `src/templates.mjs` is the HTML of every page as plain functions. The Worker renders them per request from the live data (`worker/index.js`); `src/build.mjs` also writes them into `dist/` so `npm run dev` and a static preview work. `src/lib.mjs` holds `lookCss()` (the band's colours, corners, type) and `pageConfig()` (what `site.js` needs on every page), used by both.
 - `worker/index.js` is the server: pages, `/api/checkout` (prices every line from the live catalogue, never from the browser), `/api/session`, `/api/stock`, `/api/restock`, `/api/webhook`, `/api/wants`, `/img/*` (photos uploaded in the admin, kept in KV).
-- `worker/admin.js` is the band's admin; `worker/setup.js` the readiness checks and the one-press Stripe webhook registration; `worker/stripe.js` Stripe by plain HTTPS; `worker/orders.js`, `worker/tickets.js`, `worker/refunds.js` what their names say.
+- `worker/admin.js` is the band's admin; `worker/setup.js` the readiness checks, which also connect the Stripe webhook by themselves when a key is present; `worker/stripe.js` Stripe by plain HTTPS; `worker/orders.js`, `worker/tickets.js`, `worker/refunds.js` what their names say.
 - `src/shopify.mjs` turns a Shopify CSV export into products, for both `npm run import` and the admin's Import screen.
 - `npm test` runs the unit tests; `npm run dev` runs the store at http://localhost:8787 with `.dev.vars` (wrangler gives it a local KV).
 

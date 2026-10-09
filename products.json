@@ -17,7 +17,8 @@
       }
     ],
     "ship_date": "2026-11-13",
-    "published": "2026-09-20T12:00:00Z"
+    "published": "2026-09-20T12:00:00Z",
+    "sample": true
   },
   {
     "id": "harbor-lights-cassette",
@@ -35,7 +36,8 @@
         "available": true
       }
     ],
-    "published": "2026-09-20T12:00:00Z"
+    "published": "2026-09-20T12:00:00Z",
+    "sample": true
   },
   {
     "id": "dog-logo-tee",
@@ -75,7 +77,8 @@
         "price": 2800
       }
     ],
-    "published": "2026-08-01T12:00:00Z"
+    "published": "2026-08-01T12:00:00Z",
+    "sample": true
   },
   {
     "id": "van-hoodie",
@@ -108,7 +111,8 @@
         "available": true
       }
     ],
-    "published": "2026-08-01T12:00:00Z"
+    "published": "2026-08-01T12:00:00Z",
+    "sample": true
   },
   {
     "id": "harbor-cap",
@@ -126,7 +130,8 @@
         "available": true
       }
     ],
-    "published": "2026-08-15T12:00:00Z"
+    "published": "2026-08-15T12:00:00Z",
+    "sample": true
   },
   {
     "id": "enamel-pin-set",
@@ -144,7 +149,8 @@
         "available": true
       }
     ],
-    "published": "2026-08-15T12:00:00Z"
+    "published": "2026-08-15T12:00:00Z",
+    "sample": true
   },
   {
     "id": "canvas-tote",
@@ -163,14 +169,15 @@
       }
     ],
     "published": "2026-08-15T12:00:00Z",
-    "hidden": true
+    "hidden": true,
+    "sample": true
   },
   {
     "id": "fall-tour-poster",
     "title": "Fall tour poster",
     "price": 2000,
     "kind": "prints",
-    "description": "18 \u00d7 24 inches, two-colour screen print on French Paper, signed and numbered edition of 150.",
+    "description": "18 × 24 inches, two-colour screen print on French Paper, signed and numbered edition of 150.",
     "images": [
       "images/fall-tour-poster.svg"
     ],
@@ -182,7 +189,8 @@
         "stock": 150
       }
     ],
-    "published": "2026-09-10T12:00:00Z"
+    "published": "2026-09-10T12:00:00Z",
+    "sample": true
   },
   {
     "id": "harbor-lights-bundle",
@@ -227,7 +235,8 @@
       }
     ],
     "ship_date": "2026-11-13",
-    "published": "2026-09-20T12:00:00Z"
+    "published": "2026-09-20T12:00:00Z",
+    "sample": true
   },
   {
     "id": "lighthouse-long-sleeve",
@@ -261,11 +270,12 @@
       }
     ],
     "live_at": "2026-11-13T20:00:00-05:00",
-    "published": "2026-09-25T12:00:00Z"
+    "published": "2026-09-25T12:00:00Z",
+    "sample": true
   },
   {
     "id": "release-show-brooklyn",
-    "title": "Harbor Lights release show \u2014 Brooklyn",
+    "title": "Harbor Lights release show — Brooklyn",
     "price": 1800,
     "kind": "other",
     "description": "Our record release show. Doors at 8, we play at 9:30.\n\nTickets are sold by us, not a ticketing company: the price you see is the price you pay.",
@@ -291,6 +301,7 @@
       "room_capacity": 300,
       "venue_contact": "boxoffice@thebroadway.example"
     },
-    "published": "2026-09-26T12:00:00Z"
+    "published": "2026-09-26T12:00:00Z",
+    "sample": true
   }
 ]

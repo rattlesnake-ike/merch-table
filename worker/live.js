@@ -115,6 +115,61 @@ export async function webhookSecret(env, hint) {
 
 export async function rememberWebhook(env, w) { return { webhook: await writeRecord(env, "webhook", w) }; }
 
+/* ---------- The Stripe key, pasted in the admin and kept encrypted under the admin password ----------
+   A Worker cannot set its own secrets, and sending a band to Cloudflare's dashboard to paste a key is
+   where the first hour used to go wrong. So the key is pasted in Setup, checked against Stripe on the
+   spot, and kept in KV encrypted (AES-GCM) with a key derived from ADMIN_KEY — the same secret that
+   already guards the whole store. An env STRIPE_SECRET_KEY still wins when set. */
+
+async function aesKey(env) {
+  if (!env.ADMIN_KEY) return null;
+  const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`merch-table stripe v1|${env.ADMIN_KEY}`));
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+export async function saveStripeKey(env, key) {
+  if (!env.STOCK) return { ok: false, error: NO_KV };
+  const k = await aesKey(env);
+  if (!k) return { ok: false, error: "ADMIN_KEY is not set, so there is nothing to lock the key with." };
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(key));
+  const v = await writeRecord(env, "stripekey", { iv: b64(iv), ct: b64(ct), mode: key.startsWith("sk_live_") ? "live" : "test", at: new Date().toISOString() });
+  await log(env, "admin", `stripe ${key.startsWith("sk_live_") ? "live" : "test"} key set`);
+  return { ok: true, fresh: { stripekey: v } };
+}
+
+/** The Stripe key from the environment, else the one the band pasted in the admin. */
+export async function stripeKey(env, hint) {
+  if (env.STRIPE_SECRET_KEY) return env.STRIPE_SECRET_KEY;
+  const rec = await readRecord(env, "stripekey", hint);
+  const k = rec?.ct ? await aesKey(env) : null;
+  if (!k) return "";
+  try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, k, unb64(rec.ct))); } catch { return ""; }
+}
+
+/** The env every handler sees: the real bindings plus the stored Stripe key, so nothing else has to know where it came from. */
+export async function withStripeKey(env, hint) {
+  if (env.STRIPE_SECRET_KEY) return env;
+  const key = await stripeKey(env, hint);
+  return key ? Object.assign(Object.create(null), env, { STRIPE_SECRET_KEY: key, STRIPE_KEY_FROM: "admin" }) : env;
+}
+
+/** The products that shipped with the template, cleared in one tap once the band has its own. */
+export const sampleIds = (products) => products.filter((p) => p.sample).map((p) => p.id);
+export async function removeSamples(env, store, products, who, hint) {
+  if (!env.STOCK) return { ok: false, error: NO_KV };
+  const ids = sampleIds(products);
+  if (!ids.length) return { ok: true, fresh: {} };
+  const deleted = (await readRecord(env, "deleted", hint)) ?? [];
+  for (const id of ids) if (!deleted.includes(id)) deleted.push(id);
+  const dv = await writeRecord(env, "deleted", deleted);
+  const cv = await writeRecord(env, "catalogue", products.filter((p) => !p.sample));
+  await log(env, who, `removed the ${ids.length} sample products`);
+  return { ok: true, fresh: { deleted: dv, catalogue: cv } };
+}
+
 async function log(env, who, what) {
   let entries = []; try { entries = JSON.parse((await env.STOCK.get("editlog")) ?? "[]"); } catch {}
   entries.unshift({ at: new Date().toISOString(), who, what });

@@ -1,11 +1,11 @@
 import { listOrders, getOrder, markShipped, trackingUrl, ticketByCode, backfillTicketIndex } from "./orders.js";
 import { refundShow } from "./refunds.js";
 import { ticketProducts, ticketsForOrder, verifyCode, admit, showOver, headcount, showStatus, showOff } from "./tickets.js";
-import { ownersOf, sessionSecret, saveProducts, saveStore, removeProduct, putImage, rememberRemoteImage, IMAGE_TYPES, MAX_IMAGE_BYTES, siteOf, PLACEHOLDER, webhookSecret, freshCookie } from "./live.js";
+import { ownersOf, sessionSecret, saveProducts, saveStore, removeProduct, putImage, rememberRemoteImage, IMAGE_TYPES, MAX_IMAGE_BYTES, siteOf, PLACEHOLDER, webhookSecret, freshCookie, saveStripeKey, withStripeKey, removeSamples, sampleIds } from "./live.js";
 import { setupChecks, connectOrders } from "./setup.js";
 import { convertShopifyCsv, slug } from "../src/shopify.mjs";
 import { FONTS } from "../src/lib.mjs";
-import { keyProblem } from "./stripe.js";
+import { keyProblem, stripe } from "./stripe.js";
 /* The band's own admin: sign in with the admin password (or an emailed link), add a product with a
    photo from your phone, change a price, mark a size sold out, save, done. No GitHub, no files, no
    terminal. Live edits go to KV and the Worker renders the pages from them; the repo stays the
@@ -137,7 +137,8 @@ export async function handleAdmin(req, env, url, store, products, hint = {}) {
     if (tries > 10) return html(`<h1>Too many tries</h1><p>Wait an hour and try again.</p>`, 429);
     if (!env.ADMIN_KEY || !timingSafeEqual(typed, env.ADMIN_KEY)) return html(`<h1>That wasn't it</h1><p>The admin password is the <code>ADMIN_KEY</code> you gave Cloudflare when you deployed. Forgotten it? Cloudflare → your store → <b>Settings → Variables and Secrets</b> → edit <code>ADMIN_KEY</code> and set a new one; it takes effect at once.</p><p><a href="/admin">Try again</a></p>`, 401);
     const session = await signToken(sec, { t: "session", email: owners[0] ?? "", via: "key", gen: 0 }, SESSION_DAYS * 24 * 3600);
-    return new Response("", { status: 302, headers: { location: "/admin", "set-cookie": sessionCookie(session, SESSION_DAYS * 24 * 3600), "cache-control": "no-store" } });
+    // A store with no Stripe key yet opens on Setup, where the key is pasted; nothing else makes sense first.
+    return new Response("", { status: 302, headers: { location: keyProblem(env.STRIPE_SECRET_KEY) ? "/admin/setup" : "/admin", "set-cookie": sessionCookie(session, SESSION_DAYS * 24 * 3600), "cache-control": "no-store" } });
   }
 
   if (path === "/admin/out") {
@@ -148,7 +149,7 @@ export async function handleAdmin(req, env, url, store, products, hint = {}) {
 
   // The setup check is also reachable with ?key=, as /api/setup always was, so a band can read it
   // before they have ever signed in.
-  if (!me && (path === "/admin/setup" || path === "/admin/connect")) {
+  if (!me && ["/admin/setup", "/admin/connect", "/admin/stripe-key", "/admin/contact", "/admin/samples"].includes(path)) {
     const key = url.searchParams.get("key") ?? (req.method === "POST" ? String((await req.clone().formData()).get("key") ?? "") : "");
     if (env.ADMIN_KEY && timingSafeEqual(key, env.ADMIN_KEY)) me = { email: owners[0] ?? "", via: "key", gen: 0, byKey: key };
   }
@@ -197,6 +198,7 @@ async function screens(req, env, url, store, products, me, demo, hint = {}) {
       ${demo ? `<p class="demo">You're looking at the admin of a made-up band's store. Everything works except saving. <a href="https://github.com/rattlesnake-ike/merch-table">This is the store</a>.</p>` : ""}
       ${savedMsg ? `<p class="demo ok">Saved: ${escapeHtml(savedMsg)}. It's live for you now, and for everyone within a minute.</p>` : ""}
       ${todo ? `<p class="demo"><b>Setup isn't finished.</b> At least ${todo} thing${todo > 1 ? "s" : ""} to do before the store can take money: <a href="/admin/setup">see what</a>.</p>` : ""}
+      ${!demo && sampleIds(products).length ? `<form method="post" action="/admin/samples" class="inline"><input type="hidden" name="_t" value="${tok}">${me.byKey ? `<input type="hidden" name="key" value="${escapeHtml(me.byKey)}">` : ""}<p class="demo" style="margin:0"><b>${sampleIds(products).length} made-up products</b> from the template are still on the table. Your own stay. <button type="submit" class="small">Remove the sample products</button></p></form>` : ""}
       <p class="sub">Tap a product to change its price, mark a size sold out, swap its photo or take it off the table. Changes go live straight away.</p>
       <p class="actions"><a class="btn" href="/admin/new">Add a product</a><a class="ghost" href="/admin/import">Import from Shopify</a></p>
       <div class="list">${rows || `<p class="sub">Nothing on the table yet. Add your first product above.</p>`}</div>
@@ -331,6 +333,38 @@ async function screens(req, env, url, store, products, me, demo, hint = {}) {
   }
 
   /* --- setup: is this store ready to take money? --- */
+  if (path === "/admin/stripe-key" && req.method === "POST") {
+    if (demo) return demoRefusal("/admin/setup");
+    const form = await req.formData();
+    if (!(await checkTok(form))) return stale("/admin/setup");
+    const key = String(form.get("stripe_key") ?? "").trim();
+    const problem = keyProblem(key);
+    if (problem) return html(`<h1>That key didn't look right</h1><p>${escapeHtml(problem[0].toUpperCase() + problem.slice(1))}</p><p><a href="/admin/setup">Back</a></p>`, 400);
+    // Checked against Stripe before it is kept, so a wrong paste is caught here and not at a fan's checkout.
+    try { await stripe({ ...env, STRIPE_SECRET_KEY: key }, "GET", "/account"); }
+    catch (e) { return html(`<h1>Stripe didn't accept that key</h1><p>${escapeHtml(e.message)}</p><p><a href="/admin/setup">Back</a></p>`, 400); }
+    const r = await saveStripeKey(env, key);
+    if (!r.ok) return html(`<h1>Couldn't keep the key</h1><p>${escapeHtml(r.error)}</p><p><a href="/admin/setup">Back</a></p>`, 500);
+    return saved(`/admin/setup?keyset=${key.startsWith("sk_live_") ? "live" : "test"}${me.byKey ? `&key=${encodeURIComponent(me.byKey)}` : ""}`, r.fresh);
+  }
+  if (path === "/admin/contact" && req.method === "POST") {
+    if (demo) return demoRefusal("/admin/setup");
+    const form = await req.formData();
+    if (!(await checkTok(form))) return stale("/admin/setup");
+    const email = String(form.get("email") ?? "").trim().slice(0, 200);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return html(`<h1>That email didn't look right</h1><p><a href="/admin/setup">Back</a></p>`, 400);
+    const r = await saveStore(env, { email }, who, hint);
+    if (!r.ok) return html(`<h1>Couldn't save</h1><p>${escapeHtml(r.error)}</p><p><a href="/admin/setup">Back</a></p>`, 500);
+    return saved(`/admin/setup${me.byKey ? `?key=${encodeURIComponent(me.byKey)}` : ""}`, r.fresh);
+  }
+  if (path === "/admin/samples" && req.method === "POST") {
+    if (demo) return demoRefusal("/admin");
+    const form = await req.formData();
+    if (!(await checkTok(form))) return stale("/admin");
+    const r = await removeSamples(env, store, products, who, hint);
+    if (!r.ok) return html(`<h1>Couldn't remove them</h1><p>${escapeHtml(r.error)}</p><p><a href="/admin">Back</a></p>`, 500);
+    return saved(`/admin?saved=${encodeURIComponent("the sample products removed")}`, r.fresh);
+  }
   if (path === "/admin/connect" && req.method === "POST") {
     if (demo) return demoRefusal("/admin/setup");
     const form = await req.formData();
@@ -344,14 +378,24 @@ async function screens(req, env, url, store, products, me, demo, hint = {}) {
     }
   }
   if (path === "/admin/setup") {
-    const r = demo ? demoChecks(store) : await setupChecks(env, url, store, hint);
+    const r = demo ? demoChecks(store) : await setupChecks(env, url, store, hint, { fix: true, products });
     const keyQ = me.byKey ? `?key=${encodeURIComponent(me.byKey)}` : "";
-    const rows = r.checks.map((c) => `<div class="chk ${c.ok === null ? "info" : c.ok ? "ok" : "todo"}"><span class="mark">${c.ok === null ? "·" : c.ok ? "✓" : "✗"}</span><div><b>${escapeHtml(c.name)}</b><p>${escapeHtml(c.detail)}</p>${c.action ? (c.action.post ? `<form method="post" action="${c.action.post}"><input type="hidden" name="_t" value="${tok}">${me.byKey ? `<input type="hidden" name="key" value="${escapeHtml(me.byKey)}">` : ""}<button type="submit" class="small">${escapeHtml(c.action.label)}</button></form>` : `<a class="btn small" href="${c.action.href}${keyQ}">${escapeHtml(c.action.label)}</a>`) : ""}</div></div>`).join("");
-    const connected = url.searchParams.get("connected");
+    const hidden = `<input type="hidden" name="_t" value="${tok}">${me.byKey ? `<input type="hidden" name="key" value="${escapeHtml(me.byKey)}">` : ""}`;
+    const formFor = (c) => {
+      if (c.form === "key") return c.keyEnv ? `<p class="fine">Set in Cloudflare (Settings → Variables and Secrets). To change it, change it there.</p>` : `<form method="post" action="/admin/stripe-key">${hidden}<label for="stripe_key" class="tight">${c.ok ? "Swap it: paste the live key when you're ready" : "Your Stripe secret key"}</label><input id="stripe_key" name="stripe_key" type="password" autocomplete="off" spellcheck="false" placeholder="sk_test_…" required><button type="submit" class="small">${c.ok ? "Use this key" : "Save the key"}</button></form>`;
+      if (c.form === "contact" && !c.ok) return `<form method="post" action="/admin/contact">${hidden}<label for="contact_email" class="tight">Contact email</label><input id="contact_email" name="email" type="email" autocomplete="email" placeholder="you@yourband.com" required><button type="submit" class="small">Save</button></form>`;
+      if (c.action?.post) return `<form method="post" action="${c.action.post}">${hidden}<button type="submit" class="small">${escapeHtml(c.action.label)}</button></form>`;
+      if (c.action?.href) return `<a class="btn small" href="${c.action.href}${keyQ}">${escapeHtml(c.action.label)}</a>`;
+      return "";
+    };
+    const rows = r.checks.map((c) => `<div class="chk ${c.ok === null ? "info" : c.ok ? "ok" : "todo"}"><span class="mark">${c.ok === null ? "·" : c.ok ? "✓" : "✗"}</span><div><b>${escapeHtml(c.name)}</b><p>${escapeHtml(c.detail)}</p>${demo ? "" : formFor(c)}</div></div>`).join("");
+    const keyset = url.searchParams.get("keyset");
+    const connected = url.searchParams.get("connected") || (r.connected?.ok ? (r.connected.livemode ? "live" : "test") : null);
     return html(`${adminNav("/admin/setup")}<header class="bar"><h1>Setup</h1></header>
-      ${demo ? `<p class="demo">On your own store each line here checks something real, and the buttons do the fix. This is a picture of a store that is nearly ready.</p>` : ""}
+      ${demo ? `<p class="demo">On your own store each line here checks something real, and the forms do the fix. This is a picture of a store that is nearly ready.</p>` : ""}
+      ${keyset ? `<p class="demo ok">Stripe ${keyset} key saved. Checked with Stripe: it works.</p>` : ""}
       ${connected ? `<p class="demo ok">Orders connected (${connected} mode). Stripe will tell this store the moment someone pays.</p>` : ""}
-      <p class="demo ${r.ready ? "ok" : ""}"><b>${r.ready ? "Ready to take orders." : `${r.todo} thing${r.todo === 1 ? "" : "s"} to do before the store can take money.`}</b></p>
+      <p class="demo ${r.ready ? "ok" : ""}"><b>${r.ready ? "Ready to take orders." : `${r.todo} thing${r.todo === 1 ? "" : "s"} to do before the store can take money.`}</b>${r.ready && !demo ? ` <a href="/admin">Put your products in.</a>` : ""}</p>
       <div class="checks">${rows}</div>
       <p class="fine">Only whoever runs this store can open this page. It shows no customer data and no keys.</p>`);
   }
@@ -456,14 +500,15 @@ async function quickTodo(env, store, hint) {
 /** What the demo's setup page shows: a store nearly ready, so the shape of the page is clear. */
 function demoChecks(store) {
   return { ready: false, todo: 1, checks: [
-    { key: "key", name: "Stripe key", ok: true, detail: "A test key. Try the store with card 4242 4242 4242 4242, any future date, any CVC. Nothing is charged." },
+    { key: "key", name: "Stripe key", ok: true, detail: "A test key, set here. Try the store with card 4242 4242 4242 4242, any future date, any CVC. Nothing is charged. On your own store you paste the key into this row and it is checked with Stripe on the spot." },
     { key: "account", name: "Stripe account", ok: true, detail: `Connected to ${store.name}.` },
     { key: "payouts", name: "Payouts", ok: false, detail: "Add your bank details in Stripe before going live. Until then money would sit in Stripe." },
-    { key: "orders", name: "Orders", ok: true, detail: "Stripe tells this store when an order is paid." },
+    { key: "orders", name: "Orders", ok: true, detail: "Stripe tells this store when an order is paid. The store connected itself the moment the key was in." },
     { key: "owners", name: "Who can sign in", ok: true, detail: "you@yourband.com, or anyone with the admin password." },
     { key: "contact", name: "Contact address", ok: true, detail: `${store.email} is on every page and receipt.` },
     { key: "domain", name: "Your own address", ok: null, detail: "The store answers at merch-table-demo.isaac-holze.workers.dev. When you own a domain: Cloudflare → Workers & Pages → this store → Settings → Domains & Routes → Add → Custom domain." },
-    { key: "live", name: "Real money", ok: null, detail: "Not yet: the key is a test key. When a test order has worked end to end, swap it for the live one in Cloudflare → Settings → Variables and Secrets." },
+    { key: "wallets", name: "Apple Pay, Google Pay, Link", ok: true, detail: "On. Fans can pay with a tap." },
+    { key: "live", name: "Real money", ok: null, detail: "Not yet: the key is a test key. When a test order has worked end to end, paste the live key into the Stripe key row above. The store reconnects itself." },
   ] };
 }
 
@@ -739,6 +784,10 @@ button{width:100%;margin-top:22px;padding:15px;font:inherit;font-weight:700;back
 .chk.ok .mark{color:#2e7d32}.chk.todo .mark{color:#b3261e}.chk.info .mark{color:#999}
 .chk p{margin:2px 0 0;color:#444;font-size:.95rem}
 .chk form{padding:0;border:0;background:none}
+.chk label.tight{margin:10px 0 4px;font-size:.95rem}
+.chk input{padding:10px}
+form.inline{padding:0;border:0;background:none;max-width:34rem;margin:0 auto 14px}
+form.inline button.small{margin:8px 0 0}
 .sizes .sw:not(:has(input:checked)) span{text-decoration:line-through;color:#999}
 .tbl{overflow-x:auto}.tbl table{border-collapse:collapse;width:100%;font-size:.95rem}.tbl td{padding:8px 10px 8px 0;border-bottom:1px solid var(--line);vertical-align:top}
 </style></head><body><main>${body}</main>

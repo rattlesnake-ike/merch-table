@@ -8,7 +8,7 @@ import { handleAdmin, currentAdmin, timingSafeEqual } from "./admin.js";
 import { recordOrder, ordersForEmail, orderRows } from "./orders.js";
 import { paymentUri, qrSvg, COINS } from "./coins.js";
 import { isTicket, ticketsForOrder, ticketHtml, usedAt, showOver, showOff } from "./tickets.js";
-import { liveProducts, liveStore, siteOf, serveImage, webhookSecret, sessionSecret, builtProducts, freshHint } from "./live.js";
+import { liveProducts, liveStore, siteOf, serveImage, webhookSecret, sessionSecret, builtProducts, freshHint, withStripeKey } from "./live.js";
 import { stripe, keyProblem, form, StripeError } from "./stripe.js";
 import { setupChecks } from "./setup.js";
 export { stripe, keyProblem, form, StripeError };
@@ -18,9 +18,13 @@ const bad = (error, status = 400, extra = {}) => json({ error, ...extra }, statu
 const html = (body, status = 200, headers = {}) => new Response(body, { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache", ...headers } });
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env0) {
     const url = new URL(req.url);
     try {
+      // The browser that just saved something carries the version it wrote, so it reads its own change.
+      const hint = freshHint(req);
+      // The Stripe key the band pasted in the admin rides along as if it were a secret.
+      const env = await withStripeKey(env0, hint);
       // A product or section address without its slash gets one, so old links and typed ones both land.
       if (/^\/(products\/[^/]+|cart|thanks|shipping)$/.test(url.pathname)) return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
       if (url.pathname.startsWith("/img/")) return (await serveImage(env, url)) ?? bad("Not found", 404);
@@ -28,8 +32,6 @@ export default {
       if (url.pathname === "/api/health") return json({ ok: true, products: builtProducts.filter((p) => !p.hidden).length });
       if (url.pathname === "/api/webhook" && req.method === "POST") return await webhook(req, env);
 
-      // The browser that just saved something carries the version it wrote, so it reads its own change.
-      const hint = freshHint(req);
       const store = await liveStore(env, hint);
       const products = await liveProducts(env, hint);
       store.siteUrl = siteOf(env, url);
