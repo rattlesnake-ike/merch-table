@@ -36,6 +36,7 @@ ${extraHead}
   </nav>
 </header>
 <main id="main">
+${store.notOpenYet ? `<p class="note notopen">This store isn't open yet: it has no way to take money. If it's yours, <a href="/admin">run this store</a> and paste your Stripe key in Setup. Two minutes.</p>` : ""}
 ${body}
 </main>
 <footer class="foot">

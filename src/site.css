@@ -86,6 +86,7 @@ td.num,th.num{text-align:right;font-family:var(--mono);white-space:nowrap}
 .note{color:var(--ink);background:#eef1f6;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;line-height:1.5;font-size:.92rem}
 .err.note{color:var(--ink);font-weight:400;background:#eef1f6;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;line-height:1.5}
 .err:empty{display:none}
+.notopen{margin:0 0 22px}
 .prose{max-width:68ch}
 .thanks{max-width:60ch}
 .foot{margin-top:70px;padding-top:16px;padding-bottom:60px;border-top:1.5px solid var(--ink);font-size:14px}

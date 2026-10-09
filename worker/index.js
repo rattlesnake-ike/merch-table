@@ -35,6 +35,8 @@ export default {
       const store = await liveStore(env, hint);
       const products = await liveProducts(env, hint);
       store.siteUrl = siteOf(env, url);
+      // A store with no Stripe key cannot sell: say so on the page, with the way in. Never on a live store.
+      store.notOpenYet = !!keyProblem(env.STRIPE_SECRET_KEY) && env.DEMO_ADMIN !== "1";
 
       if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return await handleAdmin(req, env, url, store, products, hint);
 

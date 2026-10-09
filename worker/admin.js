@@ -381,14 +381,14 @@ async function screens(req, env, url, store, products, me, demo, hint = {}) {
     const r = demo ? demoChecks(store) : await setupChecks(env, url, store, hint, { fix: true, products });
     const keyQ = me.byKey ? `?key=${encodeURIComponent(me.byKey)}` : "";
     const hidden = `<input type="hidden" name="_t" value="${tok}">${me.byKey ? `<input type="hidden" name="key" value="${escapeHtml(me.byKey)}">` : ""}`;
-    const formFor = (c) => {
+    const formFor = (c) => (c.link ? `<p class="go"><a href="${escapeHtml(c.link.href)}" target="_blank" rel="noopener">${escapeHtml(c.link.label)} ↗</a></p>` : "") + ((() => {
       if (c.form === "key") return c.keyEnv ? `<p class="fine">Set in Cloudflare (Settings → Variables and Secrets). To change it, change it there.</p>` : `<form method="post" action="/admin/stripe-key">${hidden}<label for="stripe_key" class="tight">${c.ok ? "Swap it: paste the live key when you're ready" : "Your Stripe secret key"}</label><input id="stripe_key" name="stripe_key" type="password" autocomplete="off" spellcheck="false" placeholder="sk_test_…" required><button type="submit" class="small">${c.ok ? "Use this key" : "Save the key"}</button></form>`;
       if (c.form === "contact" && !c.ok) return `<form method="post" action="/admin/contact">${hidden}<label for="contact_email" class="tight">Contact email</label><input id="contact_email" name="email" type="email" autocomplete="email" placeholder="you@yourband.com" required><button type="submit" class="small">Save</button></form>`;
       if (c.action?.post) return `<form method="post" action="${c.action.post}">${hidden}<button type="submit" class="small">${escapeHtml(c.action.label)}</button></form>`;
       if (c.action?.href) return `<a class="btn small" href="${c.action.href}${keyQ}">${escapeHtml(c.action.label)}</a>`;
       return "";
-    };
-    const rows = r.checks.map((c) => `<div class="chk ${c.ok === null ? "info" : c.ok ? "ok" : "todo"}"><span class="mark">${c.ok === null ? "·" : c.ok ? "✓" : "✗"}</span><div><b>${escapeHtml(c.name)}</b><p>${escapeHtml(c.detail)}</p>${demo ? "" : formFor(c)}</div></div>`).join("");
+    })());
+    const rows = r.checks.map((c) => `<div class="chk ${c.ok === null ? "info" : c.ok ? "ok" : "todo"}"><span class="mark">${c.ok === null ? "·" : c.ok ? "✓" : "✗"}</span><div><b>${escapeHtml(c.name)}</b><p>${escapeHtml(c.detail)}</p>${demo ? (c.link ? `<p class="go"><a href="${escapeHtml(c.link.href)}" target="_blank" rel="noopener">${escapeHtml(c.link.label)} ↗</a></p>` : "") : formFor(c)}</div></div>`).join("");
     const keyset = url.searchParams.get("keyset");
     const connected = url.searchParams.get("connected") || (r.connected?.ok ? (r.connected.livemode ? "live" : "test") : null);
     return html(`${adminNav("/admin/setup")}<header class="bar"><h1>Setup</h1></header>
@@ -500,13 +500,13 @@ async function quickTodo(env, store, hint) {
 /** What the demo's setup page shows: a store nearly ready, so the shape of the page is clear. */
 function demoChecks(store) {
   return { ready: false, todo: 1, checks: [
-    { key: "key", name: "Stripe key", ok: true, detail: "A test key, set here. Try the store with card 4242 4242 4242 4242, any future date, any CVC. Nothing is charged. On your own store you paste the key into this row and it is checked with Stripe on the spot." },
+    { key: "key", name: "Stripe key", ok: true, detail: "A test key, set here. Try the store with card 4242 4242 4242 4242, any future date, any CVC. Nothing is charged. On your own store you paste the key into this row and it is checked with Stripe on the spot.", link: { href: "https://dashboard.stripe.com/test/apikeys", label: "Open your Stripe keys page" } },
     { key: "account", name: "Stripe account", ok: true, detail: `Connected to ${store.name}.` },
     { key: "payouts", name: "Payouts", ok: false, detail: "Add your bank details in Stripe before going live. Until then money would sit in Stripe." },
     { key: "orders", name: "Orders", ok: true, detail: "Stripe tells this store when an order is paid. The store connected itself the moment the key was in." },
     { key: "owners", name: "Who can sign in", ok: true, detail: "you@yourband.com, or anyone with the admin password." },
     { key: "contact", name: "Contact address", ok: true, detail: `${store.email} is on every page and receipt.` },
-    { key: "domain", name: "Your own address", ok: null, detail: "The store answers at merch-table-demo.isaac-holze.workers.dev. When you own a domain: Cloudflare → Workers & Pages → this store → Settings → Domains & Routes → Add → Custom domain." },
+    { key: "domain", name: "Your own address", ok: null, detail: "The store answers at merch-table-demo.isaac-holze.workers.dev, which is fine to sell from. When you own a domain: on this store's settings page in Cloudflare, Domains & Routes → Add → Custom domain. The row links straight to that page on your own store." },
     { key: "wallets", name: "Apple Pay, Google Pay, Link", ok: true, detail: "On. Fans can pay with a tap." },
     { key: "live", name: "Real money", ok: null, detail: "Not yet: the key is a test key. When a test order has worked end to end, paste the live key into the Stripe key row above. The store reconnects itself." },
   ] };
@@ -785,6 +785,8 @@ button{width:100%;margin-top:22px;padding:15px;font:inherit;font-weight:700;back
 .chk p{margin:2px 0 0;color:#444;font-size:.95rem}
 .chk form{padding:0;border:0;background:none}
 .chk label.tight{margin:10px 0 4px;font-size:.95rem}
+.chk .go{margin:8px 0 0;font-size:.95rem}
+.chk .go a{font-weight:600}
 .chk input{padding:10px}
 form.inline{padding:0;border:0;background:none;max-width:34rem;margin:0 auto 14px}
 form.inline button.small{margin:8px 0 0}

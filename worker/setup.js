@@ -19,8 +19,24 @@ function webhookState(w, live, hookUrl) {
  * `form` on a check means the page shows an input right there (the Stripe key, the contact address).
  * With `fix: true` the store first connects orders itself when it can, so the band never presses anything.
  */
+/** The exact screens, so nobody hunts through a dashboard. */
+export function links(url, live) {
+  const host = url.hostname;
+  const workerName = host.endsWith(".workers.dev") ? host.split(".")[0] : null;
+  return {
+    keys: live ? "https://dashboard.stripe.com/apikeys" : "https://dashboard.stripe.com/test/apikeys",
+    liveKeys: "https://dashboard.stripe.com/apikeys",
+    activate: "https://dashboard.stripe.com/account/onboarding",
+    payouts: "https://dashboard.stripe.com/settings/payouts",
+    wallets: "https://dashboard.stripe.com/settings/payment_methods",
+    emails: "https://dashboard.stripe.com/settings/emails",
+    worker: workerName ? `https://dash.cloudflare.com/?to=/:account/workers/services/view/${workerName}/production/settings` : "https://dash.cloudflare.com/?to=/:account/workers-and-pages",
+  };
+}
+
 export async function setupChecks(env, url, store, hint, { fix = false, products = [] } = {}) {
   const site = siteOf(env, url);
+  const L = links(url, isLiveKey(env.STRIPE_SECRET_KEY));
   const checks = [];
   const add = (key, name, ok, detail, extra) => checks.push({ key, name, ok, detail, ...(extra ?? {}) });
   const k = env.STRIPE_SECRET_KEY;
@@ -28,16 +44,16 @@ export async function setupChecks(env, url, store, hint, { fix = false, products
   const live = isLiveKey(k);
   const fromAdmin = env.STRIPE_KEY_FROM === "admin";
   add("key", "Stripe key", !problem,
-    problem ? (k ? problem[0].toUpperCase() + problem.slice(1) : "Paste your Stripe secret key here. In Stripe: Developers → API keys → Secret key → Reveal. It starts with sk_test_. Not the Publishable key (pk_…), which is the one Stripe shows first.")
+    problem ? (k ? problem[0].toUpperCase() + problem.slice(1) : "Paste your Stripe secret key here. On the keys page, click Reveal next to Secret key and copy it; it starts with sk_test_. Not the Publishable key (pk_…), which is the one above it.")
       : live ? `A LIVE key${fromAdmin ? ", set here" : ""}: real cards are charged.` : `A test key${fromAdmin ? ", set here" : ""}. Try the store with card 4242 4242 4242 4242, any future date, any CVC. Nothing is charged.`,
-    { form: "key", keyEnv: !!k && !fromAdmin });
+    { form: "key", keyEnv: !!k && !fromAdmin, link: problem ? { href: L.keys, label: "Open your Stripe keys page" } : null });
 
   let acct = null;
   if (!problem) {
     try {
       acct = await stripe(env, "GET", "/account");
-      add("account", "Stripe account", true, `Connected to ${acct.business_profile?.name || acct.email || acct.id}.${acct.charges_enabled ? "" : " Charges are not enabled yet: finish activating the account in Stripe (it asks for the band's details and a bank account)."}`);
-      add("payouts", "Payouts", !!acct.payouts_enabled, acct.payouts_enabled ? "Stripe can pay you out." : "Add your bank details in Stripe before going live. Until then money would sit in Stripe.");
+      add("account", "Stripe account", true, `Connected to ${acct.business_profile?.name || acct.email || acct.id}.${acct.charges_enabled ? "" : " Charges are not enabled yet: finish activating the account (it asks for the band's details and a bank account). Test orders work meanwhile."}`, acct.charges_enabled ? null : { link: { href: L.activate, label: "Activate the account" } });
+      add("payouts", "Payouts", !!acct.payouts_enabled, acct.payouts_enabled ? "Stripe can pay you out." : "Add your bank details before going live. Until then money would sit in Stripe.", acct.payouts_enabled ? null : { link: { href: L.payouts, label: "Add bank details" } });
     } catch (e) { add("account", "Stripe account", false, e.message); }
   }
 
@@ -65,13 +81,14 @@ export async function setupChecks(env, url, store, hint, { fix = false, products
   if (samples.length) add("samples", "Sample products", false, `${samples.length} made-up products from the template are still on the table (Northern Dogs). Remove them in one go; your own stay.`, { action: { label: "Remove the sample products", post: "/admin/samples" } });
 
   const host = url.hostname;
-  add("domain", "Your own address", host.endsWith(".workers.dev") ? null : true, host.endsWith(".workers.dev") ? `The store answers at ${host}. When you own a domain: Cloudflare → Workers & Pages → this store → Settings → Domains & Routes → Add → Custom domain, and type something like shop.yourband.com. Nothing else to change; the store reconnects itself.` : `${host}. Fans and Stripe both use it.`);
+  add("domain", "Your own address", host.endsWith(".workers.dev") ? null : true, host.endsWith(".workers.dev") ? `The store answers at ${host}, which is fine to sell from. When you own a domain: on this store's settings page in Cloudflare, Domains & Routes → Add → Custom domain, and type something like shop.yourband.com. Nothing else to change; the store reconnects itself.` : `${host}. Fans and Stripe both use it.`, host.endsWith(".workers.dev") ? { link: { href: L.worker, label: "Open this store's settings in Cloudflare" } } : null);
 
   if (!problem && acct) {
     const pm = await paymentMethods(env).catch(() => null);
-    if (pm) add("wallets", "Apple Pay, Google Pay, Link", pm.off.length ? false : true, pm.off.length ? `${pm.off.join(", ")} ${pm.off.length === 1 ? "is" : "are"} off. In Stripe: Settings → Payment methods → turn ${pm.off.length === 1 ? "it" : "them"} on. Fans buy more when their phone can pay.` : "On. Fans can pay with a tap.");
+    if (pm) add("wallets", "Apple Pay, Google Pay, Link", pm.off.length ? false : true, pm.off.length ? `${pm.off.join(", ")} ${pm.off.length === 1 ? "is" : "are"} off. Turn ${pm.off.length === 1 ? "it" : "them"} on; fans buy more when their phone can pay.` : "On. Fans can pay with a tap.", pm.off.length ? { link: { href: L.wallets, label: "Payment methods in Stripe" } } : null);
+    add("receipts", "Receipts", null, "Stripe emails a receipt for every order if it's switched on: Settings → Emails → Successful payments. Worth a minute.", { link: { href: L.emails, label: "Email settings in Stripe" } });
   }
-  if (!problem) add("live", "Real money", live ? true : null, live ? "On. Buy the cheapest thing yourself with a real card and refund it in Stripe, once." : "Not yet: the key is a test key. When a test order has worked end to end, get the live one (Stripe → turn off Test mode → Developers → API keys → Secret key → Reveal) and paste it above. The store reconnects itself.");
+  if (!problem) add("live", "Real money", live ? true : null, live ? "On. Buy the cheapest thing yourself with a real card and refund it in Stripe, once." : "Not yet: the key is a test key. When a test order has worked end to end, copy the live secret key and paste it above. The store reconnects itself.", live ? null : { link: { href: L.liveKeys, label: "Your live keys page" } });
 
   checks.push({ key: "coins", name: "Stablecoin payments", ok: null, detail: "Optional. Turning this on in your Stripe Dashboard costs 1.5% against 2.9% + 30¢ on cards, settles as dollars, and refunds to the buyer's wallet by itself. Expect very few people to use it." });
 

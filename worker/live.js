@@ -39,7 +39,9 @@ export function freshCookie(versions) {
   return `${FRESH}=${encodeURIComponent(JSON.stringify(versions))}; Path=/; Max-Age=120; HttpOnly; Secure; SameSite=Lax`;
 }
 
-const newVersion = () => `${String(Date.now()).padStart(14, "0")}-${Math.random().toString(36).slice(2, 8)}`;
+// Versions sort by time; two writes in the same millisecond still sort by order.
+let lastTick = 0;
+const newVersion = () => { const t = Math.max(Date.now(), lastTick + 1); lastTick = t; return `${String(t).padStart(14, "0")}-${Math.random().toString(36).slice(2, 8)}`; };
 
 /** Read a record: the writer's own version if newer than the head, else the head's, else the legacy plain key. */
 async function readRecord(env, name, hint) {
