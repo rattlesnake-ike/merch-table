@@ -167,6 +167,19 @@ test("the Stripe key pasted in the admin is kept encrypted under the admin passw
   assert.equal(resolved.STOCK, kv, "the bindings ride along");
 });
 
+test("after the admin password is reset, the stored Stripe key is reported locked and Setup asks for it again", async () => {
+  const kv = fakeKV();
+  const r = await saveStripeKey({ STOCK: kv, ADMIN_KEY: "the old password" }, "sk_test_" + "a".repeat(40));
+  const after = await withStripeKey({ STOCK: kv, ADMIN_KEY: "the new password" }, r.fresh);
+  assert.equal(after.STRIPE_SECRET_KEY, undefined, "the old key cannot be opened");
+  assert.equal(after.STRIPE_KEY_LOCKED, true);
+  const { setupChecks } = await import("../worker/setup.js");
+  const c = (await setupChecks(after, new URL("https://band.example/admin/setup"), store, r.fresh)).checks.find((x) => x.key === "key");
+  assert.equal(c.ok, false);
+  assert.match(c.detail, /password was changed/);
+  assert.equal((await withStripeKey({ STOCK: fakeKV(), ADMIN_KEY: "pw" })).STRIPE_KEY_LOCKED, undefined, "no stored key = nothing locked");
+});
+
 test("an environment Stripe key always wins over the stored one", async () => {
   const kv = fakeKV();
   const env = { STOCK: kv, ADMIN_KEY: "pw", STRIPE_SECRET_KEY: "sk_live_" + "b".repeat(40) };

@@ -44,7 +44,7 @@ export async function setupChecks(env, url, store, hint, { fix = false, products
   const live = isLiveKey(k);
   const fromAdmin = env.STRIPE_KEY_FROM === "admin";
   add("key", "Stripe key", !problem,
-    problem ? (k ? problem[0].toUpperCase() + problem.slice(1) : "Paste your Stripe secret key here. On the keys page, click Reveal next to Secret key and copy it; it starts with sk_test_. Not the Publishable key (pk_…), which is the one above it.")
+    problem ? (k ? problem[0].toUpperCase() + problem.slice(1) : env.STRIPE_KEY_LOCKED ? "The admin password was changed, and the Stripe key you pasted was locked under the old one, so the store can't take money. Paste the secret key again (sk_test_ or sk_live_)." : "Paste your Stripe secret key here. On the keys page, click Reveal next to Secret key and copy it; it starts with sk_test_. Not the Publishable key (pk_…), which is the one above it.")
       : live ? `A LIVE key${fromAdmin ? ", set here" : ""}: real cards are charged.` : `A test key${fromAdmin ? ", set here" : ""}. Try the store with card 4242 4242 4242 4242, any future date, any CVC. Nothing is charged.`,
     { form: "key", keyEnv: !!k && !fromAdmin, link: problem ? { href: L.keys, label: "Open your Stripe keys page" } : null });
 

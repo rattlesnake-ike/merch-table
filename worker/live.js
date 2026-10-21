@@ -155,7 +155,10 @@ export async function stripeKey(env, hint) {
 export async function withStripeKey(env, hint) {
   if (env.STRIPE_SECRET_KEY) return env;
   const key = await stripeKey(env, hint);
-  return key ? Object.assign(Object.create(null), env, { STRIPE_SECRET_KEY: key, STRIPE_KEY_FROM: "admin" }) : env;
+  if (key) return Object.assign(Object.create(null), env, { STRIPE_SECRET_KEY: key, STRIPE_KEY_FROM: "admin" });
+  // A key is stored but won't unlock: ADMIN_KEY was changed (a forgotten password reset) after it was pasted. Setup says so.
+  const rec = env.STOCK ? await readRecord(env, "stripekey", hint) : null;
+  return rec?.ct ? Object.assign(Object.create(null), env, { STRIPE_KEY_LOCKED: true }) : env;
 }
 
 /** The products that shipped with the template, cleared in one tap once the band has its own. */

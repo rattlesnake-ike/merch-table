@@ -138,7 +138,7 @@ export async function handleAdmin(req, env, url, store, products, hint = {}) {
     const who = req.headers.get("cf-connecting-ip") ?? "unknown";
     const tries = await bump(env, `rl:key:${await shortHash(who)}`, 3600);
     if (tries > 10) return html(`<h1>Too many tries</h1><p>Wait an hour and try again.</p>`, 429);
-    if (!env.ADMIN_KEY || !timingSafeEqual(typed, env.ADMIN_KEY)) return html(`<h1>That wasn't it</h1><p>The admin password is the <code>ADMIN_KEY</code> you gave Cloudflare when you deployed. Forgotten it? Cloudflare → your store → <b>Settings → Variables and Secrets</b> → edit <code>ADMIN_KEY</code> and set a new one; it takes effect at once.</p><p><a href="/admin">Try again</a></p>`, 401);
+    if (!env.ADMIN_KEY || !timingSafeEqual(typed, env.ADMIN_KEY)) return html(`<h1>That wasn't it</h1><p>The admin password is the <code>ADMIN_KEY</code> you gave Cloudflare when you deployed. Forgotten it? Cloudflare → your store → <b>Settings → Variables and Secrets</b> → edit <code>ADMIN_KEY</code> and set a new one; it takes effect at once. Then paste your Stripe key again in Setup: it was locked under the old password.</p><p><a href="/admin">Try again</a></p>`, 401);
     const session = await signToken(sec, { t: "session", email: owners[0] ?? "", via: "key", gen: 0 }, SESSION_DAYS * 24 * 3600);
     // A store with no Stripe key yet opens on Setup, where the key is pasted; nothing else makes sense first.
     return new Response("", { status: 302, headers: { location: keyProblem(env.STRIPE_SECRET_KEY) ? "/admin/setup" : "/admin", "set-cookie": sessionCookie(session, SESSION_DAYS * 24 * 3600), "cache-control": "no-store" } });
