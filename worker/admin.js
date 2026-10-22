@@ -192,7 +192,7 @@ function icon(store) {
   return new Response(svg, { headers: { "content-type": "image/svg+xml", "cache-control": "public, max-age=86400" } });
 }
 
-async function bump(env, key, ttl) {
+export async function bump(env, key, ttl) {
   if (!env.STOCK) return 0;
   const n = Number((await env.STOCK.get(key)) ?? 0) + 1;
   await env.STOCK.put(key, String(n), { expirationTtl: ttl });

@@ -4,7 +4,7 @@
 // plus /admin (the band), /orders (a buyer's lookup), /tickets (a fan's tickets) and /img (uploaded pictures).
 import { isLive, variantAvailable, variantPrice, regionFor, fmtDate, merchJson, lookCss } from "../src/lib.mjs";
 import { indexPage, productPage, cartPage, thanksPage, shippingPage, notFoundPage, rss, sitemap } from "../src/templates.mjs";
-import { handleAdmin, currentAdmin, timingSafeEqual } from "./admin.js";
+import { handleAdmin, currentAdmin, timingSafeEqual, bump } from "./admin.js";
 import { recordOrder, ordersForEmail, orderRows } from "./orders.js";
 import { paymentUri, qrSvg, COINS } from "./coins.js";
 import { isTicket, ticketsForOrder, ticketHtml, usedAt, showOver, showOff } from "./tickets.js";
@@ -102,6 +102,8 @@ async function lookup(req, env, url, store) {
   if (req.method !== "POST") return page(`<h1>Your order</h1><p class="lede">Type the email you paid with and we'll show you where it is.</p><form method="post" class="restock"><div><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" aria-label="Your email"><button class="btn" type="submit">Find it</button></div></form>${help}`);
 
   if (Number(req.headers.get("content-length") ?? 0) > 2048) return page(`<h1>Try again</h1>`, 413);
+  // An email is all a buyer has, so it is all this asks; the wall is on how fast one address can ask.
+  if ((await bump(env, `lookup:${req.headers.get("cf-connecting-ip") ?? "unknown"}`, 3600)) > 20) return page(`<h1>Slow down</h1><p class="lede">Too many looks from here. Try again in an hour.</p>${help}`, 429);
   const form = await req.formData();
   const email = String(form.get("email") ?? "");
   const orders = await ordersForEmail(env, email);
@@ -138,6 +140,7 @@ async function ticketsPage(req, env, url, store, live) {
   if (req.method !== "POST") return page(`<h1>Your tickets</h1><p class="fine">Type the email you bought them with. Save this page to your phone before you leave for the show, so you have it if there's no signal at the door.</p><form method="post"><input type="email" name="email" required placeholder="you@example.com" autocomplete="email" aria-label="Your email"><button type="submit">Show my tickets</button></form>`);
 
   if (Number(req.headers.get("content-length") ?? 0) > 2048) return page(`<h1>Try again</h1>`, 413);
+  if ((await bump(env, `lookup:${req.headers.get("cf-connecting-ip") ?? "unknown"}`, 3600)) > 20) return page(`<h1>Slow down</h1><p class="fine">Too many looks from here. Try again in an hour.</p>`, 429);
   const form = await req.formData();
   const orders = await ordersForEmail(env, form.get("email"));
   const out = [];

@@ -20,7 +20,7 @@ export async function ordersScreen(req, env, url, store, products, me, demo, tok
 
   if (path === "/admin/orders.csv") {
     const rows = [["id", "date", "status", "total", "currency", "name", "email", "phone", "address", "items", "carrier", "tracking", "shipped"]];
-    for (const o of all) rows.push([o.id, o.at, o.status, ((o.total ?? 0) / 100).toFixed(2), o.currency, o.name, o.email, o.phone, addr(o).join(", "), o.goods || o.items, o.carrier, o.tracking, o.shippedAt].map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`));
+    for (const o of all) rows.push([o.id, o.at, o.status, ((o.total ?? 0) / 100).toFixed(2), o.currency, o.name, o.email, o.phone, addr(o).join(", "), o.goods || o.items, o.carrier, o.tracking, o.shippedAt].map((x) => { const s = String(x ?? ""); return `"${(/^[=+\-@\t\r]/.test(s) ? "'" + s : s).replace(/"/g, '""')}"`; }));
     return new Response(rows.map((r) => r.join(",")).join("\n") + "\n", { headers: { "content-type": "text/csv", "content-disposition": "attachment; filename=orders.csv", "cache-control": "no-store" } });
   }
 
